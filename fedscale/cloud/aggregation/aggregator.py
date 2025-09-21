@@ -99,6 +99,9 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         # Adaptive‑training state
         self.pending_client_results = []
 
+        # PyramidFL per-client (t_comp, t_total) cache for the current round
+        self._pyramid_times = {}
+
         # number of registered executors
         self.registered_executor_info = set()
         self.test_result_accumulator = []
@@ -394,7 +397,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         """
 
-        # sample_mode: random, oort or bliss
+        # sample_mode: random, oort, pyramidfl or bliss
 
         return ClientManager(args.sample_mode, args=args)
 
@@ -536,21 +539,49 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         """
 
         if self.experiment_mode == commons.SIMULATION_MODE:
+
             sampledClientsReal = []
             completionTimes = []
             completed_client_clock = {}
-            for client_to_run in sampled_clients:
-                client_cfg = self.client_conf.get(client_to_run, self.args)
-                roundDuration = self.client_manager.get_completion_time(
-                    client_to_run,
-                    cur_time=self.global_virtual_clock,
-                    batch_size=client_cfg.batch_size,
-                    local_steps=client_cfg.local_steps,
-                    model_size=self.model_size,
-                    model_amount_parameters=self.model_amount_parameters,
-                )
 
-                if self.client_manager.mode == "oort":
+            for client_to_run in sampled_clients:
+                # Default args
+                batch_size = self.args.batch_size
+                local_steps = self.args.local_steps
+                dropout_p = 0.0
+
+                # PyramidFL per-client overrides (if any)
+                if self.client_manager.mode == "pyramidfl":
+                    ov = self.client_manager.get_pyramidfl_conf(client_to_run)
+                    if ov:
+                        local_steps = int(ov.get("local_steps", local_steps))
+                        dropout_p = float(ov.get("dropout_p", 0.0))
+
+                    # Simulate completion time
+                    t_comp, roundDuration = self.client_manager.get_times_pyramid(
+                        client_id=client_to_run,
+                        cur_time=self.global_virtual_clock,
+                        batch_size=batch_size,
+                        local_steps=local_steps,
+                        model_size=self.model_size,
+                        model_amount_parameters=self.model_amount_parameters,
+                        dropout_p=dropout_p,
+                    )
+                    # cache for feedback
+                    self._pyramid_times[client_to_run] = (t_comp, roundDuration)
+
+                else:
+                    client_cfg = self.client_conf.get(client_to_run, self.args)
+                    roundDuration = self.client_manager.get_completion_time(
+                        client_to_run,
+                        cur_time=self.global_virtual_clock,
+                        batch_size=getattr(client_cfg, "batch_size", batch_size),
+                        local_steps=getattr(client_cfg, "local_steps", local_steps),
+                        model_size=self.model_size,
+                        model_amount_parameters=self.model_amount_parameters,
+                    )
+
+                if self.client_manager.mode in ("oort", "pyramidfl"):
                     self.client_manager.registerDuration(client_to_run, duration=roundDuration)
 
                 if self.client_manager.isClientActive(
@@ -571,14 +602,13 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                 for k in workers_sorted_by_completion_time[num_clients_to_collect:]
             ]
             round_duration = completionTimes[top_k_index[-1]] if top_k_index else 0.0
-            completionTimes.sort()
 
             return (
                 clients_to_run,
                 stragglers,
                 completed_client_clock,
                 round_duration,
-                completionTimes[:num_clients_to_collect],
+                [completionTimes[k] for k in top_k_index],
             )
 
         else:
@@ -639,12 +669,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         self.loss_accumulator.append(results["moving_loss"])
         cid = results["client_id"]
 
-        if self.args.adaptive_training and results.get("wall_duration", 0) > 0:
-            actual_dur = results["wall_duration"]
-            self.client_manager.registerDuration(cid, actual_dur)
-            dur_for_feedback = actual_dur
-        else:
-            dur_for_feedback = self.virtual_client_clock[cid]
+        dur_for_feedback = self.virtual_client_clock[cid]
 
         logging.info(
             "[aggregator] client %s finished, simulated_duration = %.2f s",
@@ -652,11 +677,22 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             dur_for_feedback,
         )
 
+        extra_kwargs = {}
+        if self.client_manager.mode == "pyramidfl":
+            t_pair = self._pyramid_times.get(cid, None)
+            if t_pair:
+                extra_kwargs["t_comp"] = t_pair[0]
+                extra_kwargs["t_total"] = t_pair[1]
+            if "gsize" in results:
+                extra_kwargs["gsize"] = results["gsize"]
+
         self.client_manager.register_feedback(
             cid,
             results["utility"],
             time_stamp=self.round,
             duration=dur_for_feedback,
+            success=True,
+            **extra_kwargs,
         )
 
         with self.update_lock:
@@ -897,6 +933,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         self._save_checkpoint_if_due(tag="begin-r")
 
         # ======= Now select and dispatch the *next* round =======
+        self._pyramid_times = {}
         self.sampled_participants = self.select_participants(
             select_num_participants=self.args.num_participants,
             overcommitment=self.args.overcommitment,
@@ -1079,6 +1116,13 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
     def get_client_conf(self, client_id):
         base_conf = {"learning_rate": self.args.learning_rate}
+
+        if self.args.sample_mode == "pyramidfl":
+            ov = self.client_manager.get_pyramidfl_conf(client_id) or {}
+            if "local_steps" in ov:
+                base_conf["local_steps"] = int(ov["local_steps"])
+            base_conf["pyramidfl_dropout_p"] = float(ov.get("dropout_p", 0.0))
+            return base_conf
 
         if not self.args.adaptive_training:
             return base_conf

@@ -49,8 +49,8 @@ job_conf:
     - use_cuda: True
     - num_loaders: 2
     - clock_factor: 30
-    - checkpoint_interval: 10
-    - resume_from: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark/logs/google_speech/0725_162823/aggregator/checkpoint_round270.pkl
+    # - checkpoint_interval: 10
+    # - resume_from: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark/logs/google_speech/0725_162823/aggregator/checkpoint_round270.pkl
 
     - model: resnet34                            # Models: e.g., shufflenet_v2_x2_0, mobilenet_v2, resnet34, albert-base-v2
     - gradient_policy: fed-prox                 # {"fed-yogi", "fed-prox", "fed-avg"}, "fed-avg" by default

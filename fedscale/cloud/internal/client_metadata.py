@@ -218,50 +218,54 @@ class ClientMetadata:
             else:
                 idx += 1
 
-    def get_completion_time(
+    def get_completion_time(self, cur_time, batch_size, local_steps, model_size, model_amount_parameters,
+                        augmentation_factor: float = 3.0, reduction_factor: float = 0.5, clock_factor: float = 1.0) -> float:
+        # Wrap the unified kernel with dropout_p=0
+        _, t_total = self.get_times_with_dropout(
+            cur_time=cur_time,
+            batch_size=batch_size,
+            local_steps=local_steps,
+            model_size=model_size,
+            model_amount_parameters=model_amount_parameters,
+            reduction_factor=reduction_factor,
+            dropout_p=0.0,
+            augmentation_factor=augmentation_factor,
+            clock_factor=clock_factor,
+        )
+        return t_total
+
+
+    def get_times_with_dropout(
         self,
-        cur_time: int,
+        cur_time: float,
         batch_size: int,
         local_steps: int,
         model_size: int,
         model_amount_parameters: int,
-        augmentation_factor: float = 3.0,
         reduction_factor: float = 0.5,
-        clock_factor: float = 1.0
-    ) -> float:
+        dropout_p: float = 0.0,
+        augmentation_factor: float = 3.0,
+        clock_factor: float = 1.0,
+    ) -> tuple[float, float]:
         """
-        Simulate download → local training → upload, using dynamic bandwidth and compute traces.
-
-        Args:
-            cur_time: simulation time (s) when download starts.
-            batch_size: local batch size.
-            local_steps: number of local training iterations.
-            model_size: size of the model (Mb)
-            model_amount_parameters: number of model parameters.
-            augmentation_factor: multiplies forward-flop cost to include backward.
-            reduction_factor: upload speed is bandwidth * this factor.
-
-        Returns:
-            float: simulation time (s) when upload finishes.
+        Simulate download -> compute -> upload with sparsification (dropout_p).
+        Returns (t_comp, t_total), both in seconds.
         """
-        
-        # Constants
-        WINDOW = 48 * 3600  # 48h in seconds
+        WINDOW = 48 * 3600  # 48 h
 
         self.sample_round_noise()
 
-        # 2) DOWNLOAD phase
+        # DOWNLOAD (unchanged by dropout)
         download_end = self._simulate_data_phase(
             start_time=cur_time,
             total_work=model_size * clock_factor,
             timestamps=self.timestamps_livelab,
             rate_fn=self.bandwidth,
             window=WINDOW,
-            scale=1.0  # download at full bandwidth
+            scale=1.0,
         )
 
-        # 3) COMPUTE phase
-        # total FLOPs = augmentation_factor × model_amount_parameters × batch_size × local_steps
+        # COMPUTE
         total_ops = augmentation_factor * model_amount_parameters * batch_size * local_steps
         compute_end = self._simulate_data_phase(
             start_time=download_end,
@@ -269,21 +273,26 @@ class ClientMetadata:
             timestamps=self.timestamps_carat,
             rate_fn=self.compute_speed,
             window=WINDOW,
-            scale=1.0  # compute_speed already in FLOPS
+            scale=1.0,
         )
 
-        # 4) UPLOAD phase
+        # UPLOAD (reduced payload by (1 - dropout_p))
+        effective_model_size = max(0.0, (1.0 - float(dropout_p))) * model_size
         upload_end = self._simulate_data_phase(
             start_time=compute_end,
-            total_work=model_size / reduction_factor * clock_factor, # Makes the upload phase twice as long
+            total_work=effective_model_size / reduction_factor * clock_factor,
             timestamps=self.timestamps_livelab,
             rate_fn=self.bandwidth,
             window=WINDOW,
-            scale=1.0  # upload uses same units MB/s, reduction applied via total_work
+            scale=1.0,
         )
 
-        return (upload_end-cur_time)
-    
+        t_dl  = download_end - cur_time
+        t_comp = compute_end - download_end
+        t_ul  = upload_end - compute_end
+        t_total = t_dl + t_comp + t_ul
+        return float(t_comp), float(t_total)
+
     def get_download_time(self, cur_time: float, model_size_mb: float,
                           clock_factor: float = 1.0) -> float:
         """Return ONLY the simulated download latency (sec)."""
@@ -319,53 +328,3 @@ class ClientMetadata:
         # Noise
         mu = np.log(target_mean) - (sigma**2)/2
         self._round_noise = np.random.lognormal(mean=mu, sigma=sigma)
-
-    def get_completion_time_lognormal(
-        self,
-        cur_time: float,
-        batch_size: int,
-        local_steps: int,
-        model_size: int,
-        reduction_factor: float = 0.5,
-        mean_seconds_per_sample: float = 0.005,
-        tail_skew: float = 0.6,
-    ) -> float:
-        """
-        Simulate download → lognormal‐based compute → upload.
-
-        Compute time is sampled as:
-          device_speed ~ LogNormal(mean=1, sigma=tail_skew)
-          comp_time = device_speed
-                    * mean_seconds_per_sample
-                    * batch_size
-                    * local_steps
-
-        Returns the simulated time when upload completes.
-        """
-
-        # 2) DOWNLOAD phase (same as before)
-        download_end = self._simulate_data_phase(
-            start_time=cur_time,
-            total_work=model_size,
-            timestamps=self.timestamps_livelab,
-            rate_fn=self.bandwidth,
-            window=48 * 3600,
-            scale=1.0,
-        )
-
-        # 3) COMPUTE phase (lognormal sample)
-        device_speed = max(0.0001, np.random.lognormal(mean=1.0, sigma=tail_skew))
-        comp_time = device_speed * mean_seconds_per_sample * batch_size * local_steps
-        compute_end = download_end + comp_time
-
-        # 4) UPLOAD phase (same as before, with reduction)
-        upload_end = self._simulate_data_phase(
-            start_time=compute_end,
-            total_work=model_mb / reduction_factor,
-            timestamps=self.timestamps_livelab,
-            rate_fn=self.bandwidth,
-            window=48 * 3600,
-            scale=1.0,
-        )
-
-        return upload_end

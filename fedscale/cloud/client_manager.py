@@ -1,7 +1,7 @@
 import logging
 import pickle
 from random import Random
-from typing import List
+from typing import List, Tuple, Dict, Optional
 import numpy as np
 import math
 
@@ -23,6 +23,12 @@ class ClientManager:
             from thirdparty.oort.oort import create_training_selector
             self.ucb_sampler = create_training_selector(args=args)
 
+        if self.mode == 'pyramidfl':
+            from thirdparty.oort.oort import create_pyramid_training_selector
+            self.pyr_sampler = create_pyramid_training_selector(args=args)
+            self._pyr_overrides: Dict[int, Dict[str, float | int]] = {}
+            self._round_start_time: float = 0.0
+
         if self.mode == 'bliss':
             from thirdparty.bliss.bliss import create_training_selector
             self.bliss_sampler = create_training_selector(args=args)
@@ -40,23 +46,19 @@ class ClientManager:
         self.clients_keys = list(self.clients.keys())
 
     def register_client(self, host_id: int, client_id: int, size: int,
-                        duration: float = 1) -> None:
+                        duration: float = 0.0) -> None:
         """Register client information to the client manager.
 
         Args:
             host_id (int): executor Id.
             client_id (int): client Id.
             size (int): number of samples on this client.
-            speed (Dict[str, float]): device speed (e.g., compuutation and communication).
-            duration (float): execution latency.
-
+            duration (float): (ignored for Oort init) execution latency; we force 0.
         """
-
         if client_id in self.client_metadata:
             return
 
         cd = self.clients[client_id]
-        # extract everything your modified ClientMetadata __init__ needs:
         self.client_metadata[client_id] = ClientMetadata(
             host_id=host_id,
             client_id=client_id,
@@ -73,16 +75,28 @@ class ClientManager:
             peak_throughput=cd['peak_throughput'],
         )
 
-        # remove clients
-        if size >= self.filter_less and size <= self.filter_more:
+        # Admit client iff size is within bounds
+        if self.filter_less <= size <= self.filter_more:
             self.feasibleClients.append(client_id)
             self.feasible_samples += size
 
             if self.mode == "oort":
-                feedbacks = {'reward': min(size, self.args.local_steps * self.args.batch_size),
-                             'duration': duration,
-                             }
+                feedbacks = {
+                    'reward': 0.0,   # statistical utility prior = 0
+                    'duration': 0.0, # system utility prior = 0
+                }
                 self.ucb_sampler.register_client(client_id, feedbacks=feedbacks)
+            
+            elif self.mode == "pyramidfl":
+                feedbacks = {
+                    'reward': 0.0,
+                    'duration': 0.0,
+                    'gsize': 0.0,
+                    't_comp': None,
+                    't_total': None,
+                }
+                self.pyr_sampler.register_client(client_id, feedbacks=feedbacks)
+
             elif self.mode == "bliss":
                 feedbacks = {
                     'metadata': {
@@ -102,6 +116,45 @@ class ClientManager:
         else:
             del self.client_metadata[client_id]
 
+
+    def select_participants(self, num_of_clients: int, cur_time: float = 0) -> List[int]:
+        """Select participating clients for current execution task.
+
+        We always route Oort selection through the sampler (no special casing for round=1),
+        because the sampler now handles the unexplored/explored split itself.
+        """
+        self.count += 1
+
+        clients_online = self.getOnlineClients(cur_time)
+        clients_online_set = set(clients_online)
+
+        if self.mode == "oort":
+            return self.ucb_sampler.select_participant(
+                num_of_clients, feasible_clients=clients_online_set
+            )
+
+        if self.mode == "pyramidfl":
+            self._round_start_time = cur_time
+            picked = self.pyr_sampler.select_participant(num_of_clients, feasible_clients=clients_online_set)
+            self._pyr_overrides = self.pyr_sampler.get_overrides()
+            return picked
+
+        elif self.mode == "bliss":
+            clients_to_predict_utility = self.bliss_sampler.request_clients_to_predict_utility(clients_online)
+            clients_to_refresh_utility = self.bliss_sampler.request_clients_to_refresh_utility(clients_online)
+
+            self.send_bliss_metadata(clients_to_predict_utility, cur_time, self.bliss_sampler.send_clients_to_predict)
+            self.send_bliss_metadata(clients_to_refresh_utility, cur_time, self.bliss_sampler.send_clients_to_refresh)
+
+            pickled_clients = self.bliss_sampler.select_participant(num_of_clients)
+            self.send_bliss_metadata(pickled_clients, cur_time, self.bliss_sampler.update_client_metadata_pre_training)
+            return pickled_clients
+
+        else:
+            self.rng.shuffle(clients_online)
+            return clients_online[:num_of_clients]
+
+
     def getAllClients(self):
         return self.feasibleClients
 
@@ -114,6 +167,9 @@ class ClientManager:
     def registerDuration(self, client_id, duration):
         if self.mode == "oort":
             self.ucb_sampler.update_duration(client_id, duration)
+
+        elif self.mode == "pyramidfl":
+            self.pyr_sampler.update_duration(client_id, duration)
 
         meta = self.client_metadata.get(client_id)
         if meta is not None:
@@ -141,7 +197,8 @@ class ClientManager:
         self.register_feedback(client_id, reward, time_stamp=time_stamp, duration=duration, success=success)
 
     def register_feedback(self, client_id: int, reward: float, time_stamp: float = 0,
-                          duration: float = 1., success: bool = True) -> None:
+                          duration: float = 1., success: bool = True, **kwargs) -> None:
+
         """Collect client execution feedbacks of last round.
 
         Args:
@@ -162,6 +219,18 @@ class ClientManager:
             }
 
             self.ucb_sampler.update_client_util(client_id, feedbacks=feedbacks)
+
+        elif self.mode == "pyramidfl":
+            feedbacks = {
+                'reward': reward,
+                'duration': duration,
+                'status': bool(success),
+                'time_stamp': time_stamp,
+                'gsize': kwargs.get('gsize', None),
+                't_comp': kwargs.get('t_comp', None),
+                't_total': kwargs.get('t_total', None),
+            }
+            self.pyr_sampler.update_client_util(client_id, feedbacks=feedbacks)
 
         elif self.mode == "bliss":
             feedbacks = {
@@ -239,7 +308,11 @@ class ClientManager:
 
     def isClientActive(self, client_id, cur_time):
         return self.client_metadata[client_id].is_active(cur_time)
+    
 
+    # ──────────────────────────────────────────────────────────────
+    #  Bliss
+    # ──────────────────────────────────────────────────────────────
     @staticmethod
     def extract_last5_windows(
             norm_t: float,
@@ -370,51 +443,42 @@ class ClientManager:
                         }
                     }
                 )
-
-
-    def select_participants(self, num_of_clients: int, cur_time: float = 0) -> List[int]:
-        """Select participating clients for current execution task.
-
-        Args:
-            num_of_clients (int): number of participants to select.
-            cur_time (float): current wall clock time.
-
-        Returns:
-            List[int]: indices of selected clients.
-
-        """
-        self.count += 1
-
-        clients_online = self.getOnlineClients(cur_time)
-
-        if len(clients_online) <= num_of_clients:
-            return clients_online
-
-        pickled_clients = None
-        clients_online_set = set(clients_online)
-
-        if self.mode == "oort" and self.count > 1:
-            pickled_clients = self.ucb_sampler.select_participant(
-                num_of_clients, feasible_clients=clients_online_set)
             
-        elif self.mode == "bliss":
+    # ──────────────────────────────────────────────────────────────
+    #  PyramidFL
+    # ──────────────────────────────────────────────────────────────
+            
 
-            clients_to_predict_utility = self.bliss_sampler.request_clients_to_predict_utility(clients_online)
-            clients_to_refresh_utility = self.bliss_sampler.request_clients_to_refresh_utility(clients_online)
+    def get_pyramidfl_conf(self, client_id: int) -> Optional[dict]:
+        """Return per-client overrides computed by PyramidFL for the CURRENT round."""
+        return self._pyr_overrides.get(client_id, None)
 
-            self.send_bliss_metadata(clients_to_predict_utility, cur_time, self.bliss_sampler.send_clients_to_predict)
-            self.send_bliss_metadata(clients_to_refresh_utility, cur_time, self.bliss_sampler.send_clients_to_refresh)
+    def get_times_pyramid(
+        self,
+        client_id: int,
+        cur_time: float,
+        batch_size: int,
+        local_steps: int,
+        model_size: int,
+        model_amount_parameters: int,
+        dropout_p: float,
+    ) -> Tuple[float, float]:
+        """Return (t_comp, t_total) for PyramidFL with given overrides."""
+        return self.client_metadata[client_id].get_times_with_dropout(
+            cur_time=cur_time,
+            batch_size=batch_size,
+            local_steps=local_steps,
+            model_size=model_size,
+            model_amount_parameters=model_amount_parameters,
+            reduction_factor=0.5,
+            dropout_p=dropout_p,
+            clock_factor=self.args.clock_factor,
+        )
 
-            pickled_clients = self.bliss_sampler.select_participant(num_of_clients)
 
-            self.send_bliss_metadata(pickled_clients, cur_time, self.bliss_sampler.update_client_metadata_pre_training)
-
-        else:
-            self.rng.shuffle(clients_online)
-            client_len = min(num_of_clients, len(clients_online))
-            pickled_clients = clients_online[:client_len]   
-
-        return pickled_clients
+    # ──────────────────────────────────────────────────────────────
+    #  Utils
+    # ──────────────────────────────────────────────────────────────
 
     def resampleClients(self, num_of_clients, cur_time=0):
         return self.select_participants(num_of_clients, cur_time)
@@ -458,5 +522,6 @@ class ClientManager:
             return self.bliss_sampler.get_pacer_state()
         if self.mode == "oort" and hasattr(self, "ucb_sampler"):
             return self.ucb_sampler.get_pacer_state()
+        if self.mode == "pyramidfl" and hasattr(self, "pyr_sampler"):
+            return self.pyr_sampler.get_pacer_state()
         return {"algo": self.mode, "note": "no pacer state"}
-

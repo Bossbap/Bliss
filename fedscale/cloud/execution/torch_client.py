@@ -27,10 +27,11 @@ class TorchClient(ClientBase):
         self.device = args.cuda_device if args.use_cuda else torch.device(
             'cpu')
         if args.task == "detection":
-            self.im_data = Variable(torch.FloatTensor(1).cuda())
-            self.im_info = Variable(torch.FloatTensor(1).cuda())
-            self.num_boxes = Variable(torch.LongTensor(1).cuda())
-            self.gt_boxes = Variable(torch.FloatTensor(1).cuda())
+            dev = args.cuda_device if args.use_cuda else torch.device("cpu")
+            self.im_data   = Variable(torch.FloatTensor(1)).to(dev)
+            self.im_info   = Variable(torch.FloatTensor(1)).to(dev)
+            self.num_boxes = Variable(torch.LongTensor(1)).to(dev)
+            self.gt_boxes  = Variable(torch.FloatTensor(1)).to(dev)
 
         self.epoch_train_loss = 1e-4
         self.completed_steps = 0
@@ -53,12 +54,19 @@ class TorchClient(ClientBase):
         model = model.to(device=self.device)
         model.train()
 
+        with torch.no_grad():
+            global_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+
+        # Override local steps if PyramidFL set it; else use provided local_steps
+        local_steps = int(getattr(conf, "local_steps", self.args.local_steps))
+
         trained_unique_samples = min(
-            len(client_data.dataset), conf.local_steps * conf.batch_size)
+            len(client_data.dataset), local_steps * conf.batch_size)
         self.global_model = None
 
         self.loss_sq_sum = 0.0
         self.seen_samples = 0
+        self.completed_steps = 0
 
         if conf.gradient_policy == 'fed-prox':
             # could be move to optimizer
@@ -66,25 +74,70 @@ class TorchClient(ClientBase):
 
         optimizer = self.get_optimizer(model, conf)
         criterion = self.get_criterion(conf)
-        error_type = None
 
         # NOTE: If one may hope to run fixed number of epochs, instead of iterations,
-        # use `while self.completed_steps < conf.local_steps * len(client_data)` instead
-        while self.completed_steps < conf.local_steps:
+        # use `while self.completed_steps < local_steps * len(client_data)` instead
+        while self.completed_steps < local_steps:
             self.train_step(client_data, conf, model, optimizer, criterion)
 
-        state_dicts = model.state_dict()
-        model_param = {p: state_dicts[p].data.cpu().numpy()
-                       for p in state_dicts}
-        results = {'client_id': client_id, 'moving_loss': self.epoch_train_loss,
-                   'trained_size': self.completed_steps * conf.batch_size,
-                   'success': self.completed_steps == conf.local_steps}
+        # ----- compute delta, G_i, apply top-k sparsification (global) -----
+        with torch.no_grad():
+            cur_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+            # build flat delta vector
+            flat_list = []
+            shapes = {}
+            order = []
+            for k in cur_state.keys():
+                d = (cur_state[k] - global_state[k]).detach()
+                shapes[k] = d.shape
+                order.append(k)
+                flat_list.append(d.view(-1))
+            if len(flat_list) == 0:
+                total_elems = 0
+                flat_delta = torch.tensor([], device=self.device)
+            else:
+                flat_delta = torch.cat(flat_list)
+                total_elems = flat_delta.numel()
 
+            # G_i (L2 norm) BEFORE sparsification
+            gsize = float(torch.linalg.norm(flat_delta, ord=2).item()) if total_elems > 0 else 0.0
 
+            # PyramidFL dropout
+            p_drop = float(getattr(conf, "pyramidfl_dropout_p", 0.0) or 0.0)
+            p_drop = max(0.0, min(0.999999, p_drop))
+            if total_elems > 0 and p_drop > 0.0:
+                k_keep = max(1, int((1.0 - p_drop) * total_elems))
+                abs_flat = flat_delta.abs()
+                # threshold of top-k
+                if k_keep < total_elems:
+                    topk_vals, _ = torch.topk(abs_flat, k_keep, largest=True, sorted=False)
+                    th = topk_vals.min()
+                    mask = (abs_flat >= th)
+                else:
+                    mask = torch.ones_like(abs_flat, dtype=torch.bool)
+                flat_delta = flat_delta * mask
+
+        # reconstruct masked local weights: global + masked_delta
+            masked_params = {}
+            cursor = 0
+            for k in order:
+                seg = flat_delta[cursor: cursor + cur_state[k].numel()].view(shapes[k])
+                cursor += cur_state[k].numel()
+                masked_params[k] = (global_state[k] + seg).detach()
+
+        model_param = {p: masked_params[p].cpu().numpy() for p in masked_params}
         rms_loss = math.sqrt(self.loss_sq_sum / max(1, self.seen_samples))
-        results['utility'] = rms_loss * float(trained_unique_samples)
-        results['update_weight'] = model_param
-        results['wall_duration'] = 0
+
+        results = {
+            'client_id': client_id,
+            'moving_loss': self.epoch_train_loss,
+            'trained_size': local_steps * conf.batch_size,
+            'success': self.completed_steps == local_steps,
+            'utility': rms_loss * float(trained_unique_samples),
+            'update_weight': model_param,
+            'wall_duration': 0,
+            'gsize': gsize,  # PyramidFL metadata
+        }
 
         return results
 

@@ -2,17 +2,19 @@
 
 # ========== Cluster configuration ========== 
 # ip address of the parameter server (need 1 GPU process)
-ps_ip: 129.104.252.45
+ps_ip: 129.104.253.51
 
 # ip address of each worker:# of available gpus process on each gpu in this node
 # Note that if we collocate ps and worker on same GPU, then we need to decrease this number of available processes on that GPU by 1
 # E.g., master node has 4 available processes, then 1 for the ps, and worker should be set to: worker:3
 worker_ips: 
-    - 129.104.252.45:[3]
+    - 129.104.253.51:[3]
     - 129.104.253.44:[4]
-    - 129.104.253.45:[4]
-    - 129.104.252.54:[4]
-
+    - 129.104.252.50:[4]
+    - 129.104.254.52:[3]
+    - 129.104.252.53:[4]
+    - 129.104.252.56:[4]
+    - 129.104.252.38:[4]
 
 exp_path: /users/eleves-a/2024/baptiste.geisenberger/FedScale/fedscale/cloud
 
@@ -46,7 +48,7 @@ job_conf:
     - use_cuda: True
     - num_loaders: 2
     - clock_factor: 30
-    - checkpoint_interval: 20
+    # - checkpoint_interval: 20
 
     - model: resnet34                            # Models: e.g., shufflenet_v2_x2_0, mobilenet_v2, resnet34, albert-base-v2
     - gradient_policy: fed-prox                 # {"fed-yogi", "fed-prox", "fed-avg"}, "fed-avg" by default
