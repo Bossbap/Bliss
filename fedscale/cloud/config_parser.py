@@ -143,9 +143,9 @@ parser.add_argument("--round_threshold", type=float, default=30)
 parser.add_argument("--round_penalty", type=float, default=2.0)
 
 # for PyramidFL
-parser.add_argument("dropout_a", type=float, default=5)
-parser.add_argument("dropout_b", type=float, default=5)
-parser.add_argument("confidence_beta", type=float, default=5)
+parser.add_argument("--dropout_a", type=float, default=0.1)
+parser.add_argument("--dropout_b", type=float, default=0.6)
+parser.add_argument("--confidence_beta", type=float, default=0.7)
 
 # for Bliss
 parser.add_argument("--number_clients_to_refresh_utility", type=int, default=300)

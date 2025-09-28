@@ -1,4 +1,5 @@
 import logging
+import copy
 import pickle
 from random import Random
 from typing import List, Tuple, Dict, Optional
@@ -43,10 +44,21 @@ class ClientManager:
 
         with open(args.clients_file, 'rb') as fin:
             self.clients = pickle.load(fin)
-        self.clients_keys = list(self.clients.keys())
+        # Ensure deterministic order for modulo mapping even if the pickle is an OrderedDict
+        self.clients_keys = sorted(self.clients.keys())
+        self._base_pool_size = len(self.clients_keys)
+        # Noise hyperparams (kept local to ClientManager; can be surfaced to args if desired)
+        self._noise_std = 0.07   # truncated N(0, 0.07)
+        self._noise_lo  = -1.0   # truncate to [-1, 1]
+        self._noise_hi  =  1.0
+        # Feature ranges for clipping/denorm
+        self._ranges = {
+            "rate":         (1.0, 54.0),
+            "availability": (35.0, 100.0),
+            "batteryLevel": (-1.0, 99.0),
+        }
 
-    def register_client(self, host_id: int, client_id: int, size: int,
-                        duration: float = 0.0) -> None:
+    def register_client(self, host_id: int, client_id: int, size: int) -> None:
         """Register client information to the client manager.
 
         Args:
@@ -58,7 +70,14 @@ class ClientManager:
         if client_id in self.client_metadata:
             return
 
-        cd = self.clients[client_id]
+        # --- Map real client_id to a base profile (wrap if needed), then add noise if wrapped ---
+        if client_id in self.clients:
+            cd = self.clients[client_id]
+        else:
+            base_key = self.clients_keys[client_id % self._base_pool_size]
+            base_cd  = self.clients[base_key]
+            cd = self._synthesise_client(base_cd, client_id)
+            
         self.client_metadata[client_id] = ClientMetadata(
             host_id=host_id,
             client_id=client_id,
@@ -491,6 +510,133 @@ class ClientManager:
 
     def getDataInfo(self):
         return {'total_feasible_clients': len(self.feasibleClients), 'total_num_samples': self.feasible_samples}
+    
+    
+
+
+    # ──────────────────────────────────────────────────────────────
+    #  Synthetic client helpers (wrap + noisy dynamics)
+    # ──────────────────────────────────────────────────────────────
+    def _trunc_gauss(self, sigma: float) -> float:
+        """Sample ε ~ N(0, σ) truncated to [-1, 1]."""
+        while True:
+            eps = np.random.normal(loc=0.0, scale=sigma)
+            if self._noise_lo <= eps <= self._noise_hi:
+                return float(eps)
+
+    @staticmethod
+    def _active_intervals(active: list[int], inactive: list[int]) -> list[tuple[float, float]]:
+        """Return [(start,end), ...] active intervals over [0, 48h). Handles wrap-around."""
+        T = 48 * 3600.0
+        # Merge boundaries tagged with the phase that begins at the timestamp
+        boundaries = sorted([(ts, 'a') for ts in active] + [(ts, 'i') for ts in inactive])
+        if not boundaries:
+            return []  # no information; treat as always inactive
+        # Initial phase at t=0
+        phase = 'a' if (active and active[0] == 0) else 'i'
+        intervals = []
+        last_ts = 0.0
+        for ts, _ in boundaries[1:]:
+            # [last_ts, ts) carries the previous phase
+            if phase == 'a':
+                intervals.append((last_ts, float(ts)))
+            phase = 'i' if phase == 'a' else 'a'
+            last_ts = float(ts)
+        # Final tail to T
+        if phase == 'a':
+            intervals.append((last_ts, T))
+        # If first boundary not at 0, we also have a head segment [0, boundaries[0].ts)
+        first_ts = float(boundaries[0][0])
+        phase0 = 'a' if (active and active[0] == 0) else 'i'
+        if first_ts > 0 and phase0 == 'a':
+            intervals.insert(0, (0.0, first_ts))
+        # Normalize / split any wrap-around (shouldn’t exist after above logic, but keep safe)
+        out = []
+        for s, e in intervals:
+            if e >= s:
+                out.append((s, e))
+            else:
+                out.append((s, T))
+                out.append((0.0, e))
+        return out
+
+    @staticmethod
+    def _ts_in_any_interval(ts: float, intervals: list[tuple[float, float]]) -> bool:
+        for s, e in intervals:
+            if s <= ts < e:
+                return True
+        return False
+
+    def _apply_activity_noise(
+        self,
+        timestamps: list[int],
+        values: list[float],
+        act_intervals: list[tuple[float, float]],
+        feature_name: str,
+    ) -> list[float]:
+        """Add a single ε (per *active interval*) to all values whose segment starts inside that interval.
+        Values are normalized to [0,1], shifted by ε, clipped to [0,1], then denormalized back
+        and clipped to the feature’s real range.
+        """
+        lo, hi = self._ranges[feature_name]
+        T = 48 * 3600.0
+        ts_arr = np.asarray(timestamps, dtype=np.float32)
+        vals   = np.asarray(values, dtype=np.float32)
+        out    = vals.copy()
+
+        if len(ts_arr) == 0 or len(vals) == 0:
+            return values
+
+        # Build a lookup from interval -> indices whose segment starts in it
+        # For each active interval, sample one ε and apply to all those indices.
+        for (s, e) in act_intervals:
+            # indices i where ts_i ∈ [s, e)
+            mask = (ts_arr >= s) & (ts_arr < e)
+            idxs = np.where(mask)[0]
+            if idxs.size == 0:
+                continue
+            eps = self._trunc_gauss(self._noise_std)
+            # normalize, shift, clip, denormalize, clip
+            v = out[idxs]
+            v_norm = (v - lo) / (hi - lo)
+            v_norm = np.clip(v_norm + eps, 0.0, 1.0)
+            v_new  = lo + v_norm * (hi - lo)
+            out[idxs] = np.clip(v_new, lo, hi)
+
+        return out.tolist()
+
+    def _synthesise_client(self, base_cd: dict, new_client_id: int) -> dict:
+        """Create a synthetic client by copying base_cd and applying activity-period noise to dynamics."""
+        cd = copy.deepcopy(base_cd)
+        # Activity schedule (kept identical)
+        act = cd.get('active', [])
+        ina = cd.get('inactive', [])
+        act_intervals = self._active_intervals(act, ina)
+
+        # Apply noise to the three dynamic series *during active periods only*
+        # rate -> timestamps-livelab
+        cd['rate'] = self._apply_activity_noise(
+            timestamps=cd['timestamps-livelab'],
+            values=cd['rate'],
+            act_intervals=act_intervals,
+            feature_name='rate',
+        )
+        # availability & batteryLevel -> timestamps-carat
+        cd['availability'] = self._apply_activity_noise(
+            timestamps=cd['timestamps-carat'],
+            values=cd['availability'],
+            act_intervals=act_intervals,
+            feature_name='availability',
+        )
+        cd['batteryLevel'] = self._apply_activity_noise(
+            timestamps=cd['timestamps-carat'],
+            values=cd['batteryLevel'],
+            act_intervals=act_intervals,
+            feature_name='batteryLevel',
+        )
+        return cd
+    
+
     
 
     

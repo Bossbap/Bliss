@@ -5,7 +5,8 @@ import pickle
 import random
 import time
 from argparse import Namespace
-import csv 
+import csv
+import os
 
 import numpy as np
 import torch

@@ -237,13 +237,13 @@ def encode_static_metadata(static_meta: Dict[str, Any]) -> np.ndarray:
     Aggregate all static-feature encodings into a single 1-D vector.
 
     Order of concatenation  (→ feature index ranges stay stable):
-    1. [2 ]  encode_os_osVersion
+    1. [2]   encode_os_osVersion
     2. [28]  encode_brand
-    3. [27 ]  encode_model_cluster   (27 = #clusters in clusters.json)
-    4. [1 ]  encode_ram
-    5. [1 ]  encode_internal_memory
-    6. [1 ]  encode_battery
-    7. [3 ]  encode_int_features    (cpu_flops, gpu_flops, throughput)
+    3. [27]  encode_model_cluster   (27 = #clusters in clusters.json)
+    4. [1]   encode_ram
+    5. [1]   encode_internal_memory
+    6. [1]   encode_battery
+    7. [3]   encode_int_features    (cpu_flops, gpu_flops, throughput)
     ----------------------------------------------------------------
     N_total = 2 + 28 + 27 + 1 + 1 + 1 + 3 = 63
     """

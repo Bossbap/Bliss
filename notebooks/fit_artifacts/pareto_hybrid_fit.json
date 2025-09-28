@@ -1,0 +1,15 @@
+{
+  "dataset": "google_speech",
+  "min_samples_filter": 16,
+  "pct_xmin": 90,
+  "xmin": 116.0,
+  "alpha_hat": 12.216885712105,
+  "p_tail": 0.10244577757268113,
+  "n_clients_filtered": 2167,
+  "total_clips_filtered": 102851,
+  "rng_seed": 42,
+  "artifacts": {
+    "body_values_npy": "/users/eleves-a/2024/baptiste.geisenberger/FedScale/notebooks/fit_artifacts/body_counts_below_xmin.npy"
+  },
+  "notes": "Hybrid generator: empirical body (<xmin) resampled with replacement; tail >= xmin ~ Pareto(alpha_hat, scale=xmin)."
+}

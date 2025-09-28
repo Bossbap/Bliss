@@ -34,7 +34,7 @@ setup_commands:
 
 job_conf: 
 
-    - wandb_token: c5a1a0bea7a1022889068d96b579c791dc52420e
+    # - wandb_token: c5a1a0bea7a1022889068d96b579c791dc52420e
     - job_name: femnist                   # Generate logs under this folder: log_path/job_name/time_stamp
     - num_classes: 62
     - log_path: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark # Path of log files

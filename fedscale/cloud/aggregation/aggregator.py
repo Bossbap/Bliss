@@ -538,91 +538,77 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         """
 
-        if self.experiment_mode == commons.SIMULATION_MODE:
 
-            sampledClientsReal = []
-            completionTimes = []
-            completed_client_clock = {}
+        sampledClientsReal = []
+        completionTimes = []
+        completed_client_clock = {}
 
-            for client_to_run in sampled_clients:
-                # Default args
-                batch_size = self.args.batch_size
-                local_steps = self.args.local_steps
-                dropout_p = 0.0
+        for client_to_run in sampled_clients:
+            # Default args
+            batch_size = self.args.batch_size
+            local_steps = self.args.local_steps
+            dropout_p = 0.0
 
-                # PyramidFL per-client overrides (if any)
-                if self.client_manager.mode == "pyramidfl":
-                    ov = self.client_manager.get_pyramidfl_conf(client_to_run)
-                    if ov:
-                        local_steps = int(ov.get("local_steps", local_steps))
-                        dropout_p = float(ov.get("dropout_p", 0.0))
+            # PyramidFL per-client overrides (if any)
+            if self.client_manager.mode == "pyramidfl":
+                ov = self.client_manager.get_pyramidfl_conf(client_to_run)
+                if ov:
+                    local_steps = int(ov.get("local_steps", local_steps))
+                    dropout_p = float(ov.get("dropout_p", 0.0))
 
-                    # Simulate completion time
-                    t_comp, roundDuration = self.client_manager.get_times_pyramid(
-                        client_id=client_to_run,
-                        cur_time=self.global_virtual_clock,
-                        batch_size=batch_size,
-                        local_steps=local_steps,
-                        model_size=self.model_size,
-                        model_amount_parameters=self.model_amount_parameters,
-                        dropout_p=dropout_p,
-                    )
-                    # cache for feedback
-                    self._pyramid_times[client_to_run] = (t_comp, roundDuration)
+                # Simulate completion time
+                t_comp, roundDuration = self.client_manager.get_times_pyramid(
+                    client_id=client_to_run,
+                    cur_time=self.global_virtual_clock,
+                    batch_size=batch_size,
+                    local_steps=local_steps,
+                    model_size=self.model_size,
+                    model_amount_parameters=self.model_amount_parameters,
+                    dropout_p=dropout_p,
+                )
+                # cache for feedback
+                self._pyramid_times[client_to_run] = (t_comp, roundDuration)
 
-                else:
-                    client_cfg = self.client_conf.get(client_to_run, self.args)
-                    roundDuration = self.client_manager.get_completion_time(
-                        client_to_run,
-                        cur_time=self.global_virtual_clock,
-                        batch_size=getattr(client_cfg, "batch_size", batch_size),
-                        local_steps=getattr(client_cfg, "local_steps", local_steps),
-                        model_size=self.model_size,
-                        model_amount_parameters=self.model_amount_parameters,
-                    )
+            else:
+                client_cfg = self.client_conf.get(client_to_run, self.args)
+                roundDuration = self.client_manager.get_completion_time(
+                    client_to_run,
+                    cur_time=self.global_virtual_clock,
+                    batch_size=getattr(client_cfg, "batch_size", batch_size),
+                    local_steps=getattr(client_cfg, "local_steps", local_steps),
+                    model_size=self.model_size,
+                    model_amount_parameters=self.model_amount_parameters,
+                )
 
-                if self.client_manager.mode in ("oort", "pyramidfl"):
-                    self.client_manager.registerDuration(client_to_run, duration=roundDuration)
+            if self.client_manager.mode in ("oort", "pyramidfl"):
+                self.client_manager.registerDuration(client_to_run, duration=roundDuration)
 
-                if self.client_manager.isClientActive(
-                    client_to_run, roundDuration + self.global_virtual_clock
-                ):
-                    sampledClientsReal.append(client_to_run)
-                    completionTimes.append(roundDuration)
-                    completed_client_clock[client_to_run] = roundDuration
+            if self.client_manager.isClientActive(
+                client_to_run, roundDuration + self.global_virtual_clock
+            ):
+                sampledClientsReal.append(client_to_run)
+                completionTimes.append(roundDuration)
+                completed_client_clock[client_to_run] = roundDuration
 
-            num_clients_to_collect = min(num_clients_to_collect, len(completionTimes))
-            workers_sorted_by_completion_time = sorted(
-                range(len(completionTimes)), key=lambda k: completionTimes[k]
-            )
-            top_k_index = workers_sorted_by_completion_time[:num_clients_to_collect]
-            clients_to_run = [sampledClientsReal[k] for k in top_k_index]
-            stragglers = [
-                sampledClientsReal[k]
-                for k in workers_sorted_by_completion_time[num_clients_to_collect:]
-            ]
-            round_duration = completionTimes[top_k_index[-1]] if top_k_index else 0.0
+        num_clients_to_collect = min(num_clients_to_collect, len(completionTimes))
+        workers_sorted_by_completion_time = sorted(
+            range(len(completionTimes)), key=lambda k: completionTimes[k]
+        )
+        top_k_index = workers_sorted_by_completion_time[:num_clients_to_collect]
+        clients_to_run = [sampledClientsReal[k] for k in top_k_index]
+        stragglers = [
+            sampledClientsReal[k]
+            for k in workers_sorted_by_completion_time[num_clients_to_collect:]
+        ]
+        round_duration = completionTimes[top_k_index[-1]] if top_k_index else 0.0
 
-            return (
-                clients_to_run,
-                stragglers,
-                completed_client_clock,
-                round_duration,
-                [completionTimes[k] for k in top_k_index],
-            )
-
-        else:
-            completed_client_clock = {
-                client: {"computation": 1, "communication": 1} for client in sampled_clients
-            }
-            completionTimes = [1 for _ in sampled_clients]
-            return (
-                sampled_clients,
-                sampled_clients,
-                completed_client_clock,
-                1,
-                completionTimes,
-            )
+        return (
+            clients_to_run,
+            stragglers,
+            completed_client_clock,
+            round_duration,
+            [completionTimes[k] for k in top_k_index],
+        )
 
     # ----------------------------------------------------------------------
     #  Main loop
