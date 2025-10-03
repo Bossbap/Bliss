@@ -71,7 +71,7 @@ class DataPartitioner(object):
             logging.info(f"Trace names are {', '.join(header)}")
 
             for row in csv_reader:
-                client_id = int(row[0]) + 1 # real ID matching your clients.pkl keys
+                client_id = int(row[0])
 
                 # append this sample index under that client
                 client_dict.setdefault(client_id, []).append(sample_id)

@@ -57,7 +57,7 @@ We have integrated Tensorboard for the visualization of experiment results. To t
 
 ### WandB
 
-We also support WandB Dashboard for job parameter logging, the visualization of training/testing results, system metrics collection, and model weights checkpointing. To use WandB, add ```wandb_token: "YOUR_WANDB_TOKEN"``` under ```job_conf``` of the job configs. All the metrics and experiment results will be uploaded to the WandB account connected with your token. To enable model weights checkpointing, add ```save_checkpoint: True``` under ```job_conf``` of your job configs.
+We also support WandB Dashboard for job parameter logging, the visualization of training/testing results, and system metrics collection. To use WandB, add ```wandb_token: "YOUR_WANDB_TOKEN"``` under ```job_conf``` of the job configs. All the metrics and experiment results will be uploaded to the WandB account connected with your token.
 
 ## Logs and Metrics
 

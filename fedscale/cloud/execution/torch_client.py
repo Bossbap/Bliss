@@ -48,7 +48,6 @@ class TorchClient(ClientBase):
         :return: training results
         """
         client_id = conf.client_id
-        # logging.info(f"Start to train (CLIENT: {client_id}), dataset_size={len(client_data.dataset)}")
         tokenizer = conf.tokenizer
 
         model = model.to(device=self.device)
@@ -137,6 +136,7 @@ class TorchClient(ClientBase):
             'update_weight': model_param,
             'wall_duration': 0,
             'gsize': gsize,  # PyramidFL metadata
+            'iters': int(self.completed_steps),
         }
 
         return results
@@ -310,10 +310,6 @@ class TorchClient(ClientBase):
         test_loss, acc, acc_5, test_results = test_pytorch_model(conf.rank, model, client_data,
                                                                  device=self.device, criterion=criterion,
                                                                  tokenizer=conf.tokenizer)
-        logging.info(
-            "Test results: Eval_time {}, test_loss {}, test_accuracy {:.2f}%, "
-            "test_5_accuracy {:.2f}% \n"
-                .format(round(time.time() - evalStart, 4), test_loss, acc * 100., acc_5 * 100.))
         return test_results
 
     @overrides

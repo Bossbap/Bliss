@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import collections
 import copy
-import math
 import os
 import pickle
 import random
@@ -9,7 +8,6 @@ import threading
 import time
 from concurrent import futures
 import types
-import pathlib
 
 import grpc
 import numpy as np
@@ -60,10 +58,6 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         self.model_in_update = 0
         self.update_lock = threading.Lock()
         self.model_weights = None
-        self.temp_model_path = os.path.join(
-            logger.logDir, "model_" + str(args.this_rank) + ".npy"
-        )
-        self.last_saved_round = 0
 
         # ======== channels ========
         self.connection_timeout = self.args.connection_timeout
@@ -150,136 +144,72 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         # ======== Task specific ============
         self.init_task_context()
 
-        # ======== Resume state ============
-        self._resume_state = None
-        self._restored = False
-        if args.resume_from:
-            with open(args.resume_from, 'rb') as f:
-                self._resume_state = pickle.load(f)
-            logging.info("[checkpoint] loaded header of %s", args.resume_from)
+        # ======== logging buffers (per-round) ============
+        self._round_begin_payload = {}
+        self._pre_util_map = {}              # {cid: util_before} for oort/pyramidfl
+        self._client_round_utils = {}        # {cid: util_after}
+        self._client_time_breakdown = {}     # {cid: {t_dl,t_comp,t_ul,(iters|iters_p1|iters_p2|dropout_frac)}}
+        self.completed_clients = []          # [cid]
+        self.failed_clients = []             # [cid]
+        self._bliss_pred_seen = {}           # {cid: pred_util}
+        self._bliss_pred_unseen = {}         # {cid: pred_util}
+
 
     # ----------------------------------------------------------------------
-    #  Helpers: snapshot / restore / checkpoint
+    #  Helpers: structured logging utilities
     # ----------------------------------------------------------------------
-    def _snapshot_state(self) -> dict:
-        """Return a pickle‑friendly snapshot at the *beginning* of the current round."""
-        state = {
-            "schema_version": 1,
-            "round": self.round,
-            "global_clock": self.global_virtual_clock,
-            "at_round_begin": True,  # invariant
-            "args_state": vars(self.args).copy(),  # mutated args included!
-            "model_state": self.model_wrapper.model.state_dict(),
-            "client_mgr_state": self.client_manager.get_state(),
-            "oort_state": getattr(self.client_manager, "ucb_sampler", None),
-            "bliss_state": getattr(self.client_manager, "bliss_sampler", None),
-            "optimizer_state": getattr(
-                self.model_wrapper.optimizer, "gradient_controller", None
-            ),
-            "rng_state": {
-                "python": random.getstate(),
-                "numpy": np.random.get_state(),
-                "torch_cpu": torch.get_rng_state(),
-                "torch_cuda": torch.cuda.get_rng_state_all()
-                if torch.cuda.is_available()
-                else None,
-            },
-            # debug / sanity
-            "lr_value": float(getattr(self.args, "learning_rate", 0.0)),
-            "t_budget": float(getattr(self.args, "t_budget", 0.0)),
-        }
-        return state
 
-    def _save_checkpoint_if_due(self, tag: str = "") -> None:
-        """Persist a checkpoint if the interval matches."""
-        if not self.args.checkpoint_interval:
-            return
-        if self.round % self.args.checkpoint_interval != 0:
-            return
+    # ───────────────────────────────────────────────────────────────────
+    # JSON log helper (stable, plot-friendly one-liners)
+    # ───────────────────────────────────────────────────────────────────
+    @staticmethod
+    def _json_default(o):
+        import numpy as _np
+        if isinstance(o, (set,)):
+            return list(o)
+        if isinstance(o, (_np.generic,)):
+            return o.item()
+        if isinstance(o, (_np.ndarray,)):
+            return o.tolist()
+        return str(o)
 
-        ckpt_path = pathlib.Path(logger.logDir) / f"checkpoint_round{self.round}.pkl"
-        # self.log_control_state(f"ckpt.{tag or 'begin'}")
-        state = self._snapshot_state()
-        # self._quick_digest("before-save")
-        with ckpt_path.open("wb") as f:
-            pickle.dump(state, f)
-        logging.info("[checkpoint] saved %s", ckpt_path)
+    def _sanitize_for_json(self, obj):
+        import numpy as _np
+        # dict: sanitize keys and values
+        if isinstance(obj, dict):
+            out = {}
+            for k, v in obj.items():
+                # fix key type
+                if isinstance(k, _np.generic):
+                    k = k.item()
+                elif isinstance(k, bytes):
+                    k = k.decode("utf-8", "ignore")
+                elif not isinstance(k, (str, int, float, bool, type(None))):
+                    try:
+                        # try numeric cast first
+                        k = int(k)  # will work for numpy integers
+                    except Exception:
+                        k = str(k)
+                out[k] = self._sanitize_for_json(v)
+            return out
+        # lists/tuples/sets → list of sanitized
+        if isinstance(obj, (list, tuple, set)):
+            return [self._sanitize_for_json(x) for x in obj]
+        # numpy arrays → list
+        if isinstance(obj, _np.ndarray):
+            return obj.tolist()
+        # numpy scalars → python scalars
+        if isinstance(obj, _np.generic):
+            return obj.item()
+        # passthrough builtin scalars / other objects
+        return obj
 
-    def _restore_from_checkpoint(self, st: dict) -> None:
-        """Restore everything from a previously saved checkpoint."""
-        # 1) Args (mutated runtime config)
-        args_state = st.get("args_state", None)
-        if args_state is not None:
-            for k, v in args_state.items():
-                if hasattr(self.args, k):
-                    setattr(self.args, k, v)
-
-        # 2) Round / clock
-        self.round = st["round"]
-        self.global_virtual_clock = st["global_clock"]
-
-        # 3) Model
-        model_state = st.get("model_state")
-        if model_state is not None:
-            self.model_wrapper.model.load_state_dict(model_state)
-
-        # 4) Optimizer server-side controller (e.g., Yogi)
-        opt_state = st.get("optimizer_state")
-        if opt_state:
-            self.model_wrapper.optimizer.gradient_controller.__dict__.update(
-                opt_state.__dict__
-            )
-
-        # 5) Samplers
-        if st.get("oort_state") and hasattr(self.client_manager, "ucb_sampler"):
-            self.client_manager.ucb_sampler.__dict__.update(
-                st["oort_state"].__dict__
-            )
-        if st.get("bliss_state") and hasattr(self.client_manager, "bliss_sampler"):
-            self.client_manager.bliss_sampler.__dict__.update(
-                st["bliss_state"].__dict__
-            )
-
-        # 6) Client manager
-        if st.get("client_mgr_state"):
-            self.client_manager.load_state(st["client_mgr_state"])
-
-        # 7) RNGs
-        rng = st.get("rng_state", {})
-        if rng:
-            random.setstate(rng["python"])
-            np.random.set_state(rng["numpy"])
-            torch.set_rng_state(rng["torch_cpu"])
-            if torch.cuda.is_available() and rng.get("torch_cuda") is not None:
-                torch.cuda.set_rng_state_all(rng["torch_cuda"])
-
-        self._restored = True
-        # self._quick_digest("after-restore")
-
-
-    def _optimizer_digest(self):
-        gc = getattr(self.model_wrapper.optimizer, "gradient_controller", None)
-        if gc is None:
-            return {}
-        # Log a few key fields if they exist
-        out = {}
-        for k in ["t", "m", "v", "v_hat", "lr", "beta1", "beta2", "tau"]:
-            if hasattr(gc, k):
-                v = getattr(gc, k)
-                # vectors can be huge; just hash or show first 3 elems
-                if isinstance(v, (list, tuple)) and len(v) > 3:
-                    out[k] = (v[:3], "...", len(v))
-                else:
-                    out[k] = v
-        return out
-
-    def _quick_digest(self, tag):
-        logging.info(
-            "[ckpt-digest %s] round=%d clock=%.2f lr=%.6g pacer=%s opt=%s",
-            tag, self.round, self.global_virtual_clock, self.args.learning_rate,
-            self.client_manager.get_pacer_state(),
-            self._optimizer_digest()
-        )
+    def _log_json(self, tag: str, payload: dict) -> None:
+        try:
+            safe = self._sanitize_for_json(payload)
+            logging.info("[%s] %s", tag, json.dumps(safe, ensure_ascii=False))
+        except Exception:
+            logging.exception("[logging] failed to json-dump payload for tag=%s", tag)
 
 
     # ----------------------------------------------------------------------
@@ -351,10 +281,6 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             )
         else:
             raise ValueError(f"{self.args.engine} is not a supported engine.")
-
-        # ==== restore if requested ====
-        if self._resume_state and not self._restored:
-            self._restore_from_checkpoint(self._resume_state)
 
         self.model_weights = self.model_wrapper.get_weights()
 
@@ -431,6 +357,13 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         kept = sorted(active_pool, key=lambda x: x["wall_duration"])[:K]
         stragglers = [r for r in self.pending_client_results if r not in kept]
 
+        # group ids
+        self.completed_clients = [int(r["client_id"]) for r in kept]
+        self.failed_clients    = [int(r["client_id"]) for r in self.pending_client_results
+                                  if not r.get("success", True)]
+        self.round_stragglers  = [int(r["client_id"]) for r in stragglers
+                                  if r.get("success", True)]
+
         self.tasks_round = len(kept)
         self.round_duration = max(r["wall_duration"] for r in kept) if kept else 0.0
         self.flatten_client_duration = np.array([r["wall_duration"] for r in kept])
@@ -444,6 +377,23 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         self.client_training_results = []
 
         avg_util = (sum(r["utility"] for r in kept) / max(1, len(kept))) if kept else 0.0
+
+        # collect per-client utilities  time breakdown for logging
+        self._client_round_utils = {}
+        self._client_time_breakdown = {}
+        for r in self.pending_client_results:
+            cid = r["client_id"]
+            self._client_round_utils[cid] = float(r.get("utility", 0.0))
+            # executor returns detailed times & iterations for adaptive path
+            self._client_time_breakdown[cid] = {
+                "t_dl": float(r.get("t_dl", 0.0)),
+                "t_comp": float(r.get("t_comp", 0.0)),
+                "t_ul": float(r.get("t_ul", 0.0)),
+                # phase info is Bliss-only but harmless to include
+                "iters_p1": int(r.get("iters_phase1", 0)),
+                "iters_p2": int(r.get("iters_phase2", 0)),
+                "dropout_frac": float(r.get("dropout_frac", 0.0)),
+            }
 
         for r in kept:
             cid = r["client_id"]
@@ -475,7 +425,6 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                 success=False,
             )
 
-        self.round_stragglers = []
         self.pending_client_results.clear()
 
     # ----------------------------------------------------------------------
@@ -657,11 +606,12 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         dur_for_feedback = self.virtual_client_clock[cid]
 
-        logging.info(
-            "[aggregator] client %s finished, simulated_duration = %.2f s",
-            cid,
-            dur_for_feedback,
-        )
+        # record for summary
+        self._client_round_utils[cid] = float(results.get("utility", 0.0))
+        if results.get("success", True):
+            self.completed_clients.append(cid)
+        else:
+            self.failed_clients.append(cid)
 
         extra_kwargs = {}
         if self.client_manager.mode == "pyramidfl":
@@ -806,15 +756,11 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         # 0) BOOTSTRAP / RESUME
         # ------------------------------------------------------------------
         if bootstrap:
-            if getattr(self, "_restored", False):
-                logging.info("[checkpoint] Resuming at the BEGINNING of round %d", self.round)
-            else:
-                logging.info("Bootstrap: BEGINNING of round %d", self.round)
-
-            # Optionally checkpoint the very beginning of this round
-            self._save_checkpoint_if_due(tag="bootstrap")
+            logging.info("Bootstrap: BEGINNING of round %d", self.round)
 
             # === Select & schedule THIS round ===
+            online_clients = self.client_manager.getOnlineClients(self.global_virtual_clock)
+
             self.sampled_participants = self.select_participants(
                 select_num_participants=self.args.num_participants,
                 overcommitment=self.args.overcommitment,
@@ -843,11 +789,81 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                 self.round_duration = round_duration
                 self.round_stragglers = round_stragglers
 
-            logging.info(
-                "Selected %d participants to run: %s",
-                len(clients_to_run),
-                clients_to_run,
-            )
+                # Build per-client non-adaptive time breakdown (download/compute/upload)
+                self._client_time_breakdown = {}
+                for cid in clients_to_run:
+                    meta = self.client_manager.getClient(cid)
+                    # dropout (PyramidFL override) for this cid if any
+                    drop_p = 0.0
+                    local_steps = getattr(self.args, "local_steps", 0)
+                    if self.client_manager.mode == "pyramidfl":
+                        ov = self.client_manager.get_pyramidfl_conf(cid) or {}
+                        drop_p = float(ov.get("dropout_p", 0.0) or 0.0)
+                        local_steps = int(ov.get("local_steps", local_steps))
+                    # t_dl, t_comp, t_total
+                    t_dl = meta.get_download_time(
+                        cur_time=self.global_virtual_clock, model_size_mb=self.model_size, clock_factor=self.args.clock_factor
+                    )
+                    t_comp, t_total = meta.get_times_with_dropout(
+                        cur_time=self.global_virtual_clock,
+                        batch_size=self.args.batch_size,
+                        local_steps=local_steps if local_steps else self.args.local_steps,
+                        model_size=self.model_size,
+                        model_amount_parameters=self.model_amount_parameters,
+                        reduction_factor=0.5,
+                        dropout_p=drop_p,
+                        clock_factor=self.args.clock_factor,
+                    )
+                    t_ul = max(0.0, t_total - t_dl - t_comp)
+                    self._client_time_breakdown[int(cid)] = {
+                        "t_dl": float(t_dl), "t_comp": float(t_comp), "t_ul": float(t_ul),
+                        "iters": int(local_steps if local_steps else self.args.local_steps),
+                        "dropout_frac": float(drop_p)
+                    }
+            
+            self._pre_util_map = {}
+            if self.client_manager.mode in ("oort", "pyramidfl"):
+                try:
+                    metrics = self.client_manager.getAllMetrics() or {}
+                    for cid in clients_to_run:
+                        rec = metrics.get(cid, {})
+                        self._pre_util_map[int(cid)] = float(rec.get("reward", 0.0))
+                except Exception:
+                    logging.exception("[logging] could not gather pre-utility map")
+
+            # ── Bliss predictions (seen/unseen) for this round, when applicable
+            self._bliss_pred_seen, self._bliss_pred_unseen = {}, {}
+            if self.client_manager.mode == "bliss":
+                try:
+                    m = self.client_manager.getAllMetrics() or {}
+                    self._bliss_pred_seen   = dict(m.get("pred_seen",   {}))
+                    self._bliss_pred_unseen = dict(m.get("pred_unseen", {}))
+                except Exception:
+                    logging.exception("[logging] could not retrieve Bliss predictions")
+
+            # Reset per-round accumulators that will be filled during the round
+            self.completed_clients = []
+            self.failed_clients = []
+            self._client_round_utils = {}
+
+            # Structured round-begin log
+            self._round_begin_payload = {
+                "round": int(self.round),
+                "start_clock": float(self.global_virtual_clock),
+                "pacer": self.client_manager.get_pacer_state(),
+                "online": online_clients,
+                "sampled_overcommitted": list(self.sampled_participants),
+                "to_run": list(clients_to_run),
+                "planned_stragglers": list(self.round_stragglers),
+            }
+            if self._client_time_breakdown:
+                self._round_begin_payload["client_times_planned"] = self._client_time_breakdown
+            if self._pre_util_map:
+                self._round_begin_payload["pre_util"] = self._pre_util_map
+            if self._bliss_pred_seen or self._bliss_pred_unseen:
+                self._round_begin_payload["bliss_pred_seen"] = self._bliss_pred_seen
+                self._round_begin_payload["bliss_pred_unseen"] = self._bliss_pred_unseen
+            self._log_json("ROUND_BEGIN", self._round_begin_payload)
 
             self.resource_manager.register_tasks(clients_to_run)
 
@@ -873,12 +889,6 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         # ------------------------------------------------------------------
         # 1) NORMAL COMPLETION
         # ------------------------------------------------------------------
-        logging.info(
-            "*** ROUND %d COMPLETE: got %d/%d updates, moving on ***",
-            self.round,
-            len(self.stats_util_accumulator),
-            self.tasks_round,
-        )
 
         # Advance wall-clock & bump round number
         self.global_virtual_clock += self.round_duration
@@ -901,22 +911,49 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         # Log loss / training stats
         avg_loss = sum(self.loss_accumulator) / max(1, len(self.loss_accumulator))
-        logging.info(
-            "Wall clock: %ds, round: %d, Planned participants: %d, Succeed: %d, Loss: %f",
-            round(self.global_virtual_clock),
-            self.round,
-            len(self.sampled_participants),
-            len(self.stats_util_accumulator),
-            avg_loss,
-        )
+
+        prev_round = int(self.round)
+        round_summary = {
+            "round": prev_round,
+            "clock_end": float(self.global_virtual_clock),
+            "duration": float(self.round_duration),
+            "completed": list(self.completed_clients),
+            "stragglers": list(self.round_stragglers),
+            "dropped": list(self.failed_clients),
+            "loss_avg": float(avg_loss),
+        }
+        if self._client_time_breakdown:
+            round_summary["client_times"] = self._client_time_breakdown
+        if self.client_manager.mode in ("oort", "pyramidfl") and self._pre_util_map:
+            after = {int(cid): float(self._client_round_utils.get(cid, 0.0)) for cid in self._pre_util_map.keys()}
+            round_summary["oort_pyr_util_before"] = self._pre_util_map
+            round_summary["oort_pyr_util_after"]  = after
+        if self.client_manager.mode == "bliss":
+            # split actual utilities by seen/unseen, if we have predictions for them
+            if self._bliss_pred_seen:
+                round_summary["bliss_pred_seen"] = self._bliss_pred_seen
+                round_summary["bliss_actual_seen"] = {cid: float(self._client_round_utils.get(cid, 0.0))
+                                                      for cid in self._bliss_pred_seen.keys()}
+            if self._bliss_pred_unseen:
+                round_summary["bliss_pred_unseen"] = self._bliss_pred_unseen
+                round_summary["bliss_actual_unseen"] = {cid: float(self._client_round_utils.get(cid, 0.0))
+                                                        for cid in self._bliss_pred_unseen.keys()}
+        self._log_json("ROUND_SUMMARY", round_summary)
+
+        # reset per-round buffers (safety)
+        self._pre_util_map.clear()
+        self._client_round_utils.clear()
+        self._client_time_breakdown.clear()
+        self.completed_clients.clear()
+        self.failed_clients.clear()
+        self._bliss_pred_seen.clear()
+        self._bliss_pred_unseen.clear()
+
         if len(self.loss_accumulator):
             self.log_train_result(avg_loss)
 
         # --- Apply LR decay (& any other beginning-of-round mutations) ---
         self.update_default_task_config()
-
-        # --- Checkpoint NOW (beginning of round self.round) --------------
-        self._save_checkpoint_if_due(tag="begin-r")
 
         # ======= Now select and dispatch the *next* round =======
         self._pyramid_times = {}
@@ -1007,19 +1044,17 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         top5 = perf.get("top_5", 0.0)
         loss = perf["loss"]
         clock = perf["clock"]
+        self._log_json("TEST_RESULT", {
+            "round": int(self.round),
+            "clock": float(clock),
+            "loss": float(loss),
+            "top1": float(top1),
+            "top5": float(top5),
+        })
 
         if self.wandb is not None:
             self.wandb.log({"round": self.round, "Agg/top1": top1, "Agg/top5": top5, "Agg/loss": loss})
             self.wandb.log({"clock": clock, "AggWC/top1": top1, "AggWC/top5": top5, "AggWC/loss": loss})
-
-    def save_model(self):
-        if parser.args.save_checkpoint and self.last_saved_round < self.round:
-            self.last_saved_round = self.round
-            np.save(self.temp_model_path, self.model_weights)
-            if self.wandb is not None:
-                artifact = self.wandb.Artifact(name="model_" + str(self.this_rank), type="model")
-                artifact.add_file(local_path=self.temp_model_path)
-                self.wandb.log_artifact(artifact)
 
     # ----------------------------------------------------------------------
     #  (De)serialization helpers for RPC
@@ -1066,8 +1101,6 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             self.aggregate_test_result()
             with open(os.path.join(logger.logDir, "testing_perf"), "wb") as fout:
                 pickle.dump(self.testing_history, fout)
-
-            self.save_model()
 
             logging.info("logging test result")
             self.log_test_result()

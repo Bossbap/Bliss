@@ -66,7 +66,6 @@ parser.add_argument("--blacklist_rounds", type=int, default=-1)
 parser.add_argument("--blacklist_max_len", type=float, default=0.3)
 parser.add_argument("--embedding_file", type=str, default="glove.840B.300d.txt")
 parser.add_argument("--input_shape", type=int, nargs="+", default=[1, 3, 28, 28])
-parser.add_argument("--save_checkpoint", type=bool, default=False)
 
 
 # The configuration of different hyper-parameters for training
@@ -127,10 +126,6 @@ parser.add_argument("--clip_threshold", type=float, default=3.0)
 parser.add_argument("--target_delta", type=float, default=0.0001)
 
 # Round checkpoint
-parser.add_argument('--checkpoint_interval', type=int, default=0,
-                    help='Save a resumable checkpoint every <N> rounds (0 = off)')
-parser.add_argument('--resume_from', type=str, default='',
-                    help='Path to a .pkl checkpoint to resume from')
 
 # for Oort
 parser.add_argument("--pacer_delta", type=float, default=5)

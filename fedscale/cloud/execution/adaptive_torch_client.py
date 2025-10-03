@@ -179,6 +179,7 @@ class AdaptiveTorchClient(TorchClient):
             keep_frac     = 1.0                        # start with full payload
     
             steps_done    = 0
+            iters_phase1  = 0
             self.loss_sq_sum  = 0.0
             self.seen_samples = 0
             ewma          = 0.0
@@ -189,7 +190,7 @@ class AdaptiveTorchClient(TorchClient):
             data_it = iter(client_data)
     
             # ---------------------------------------------------------------------------------------------------
-            # --------  PHASE 2 : coarse fit‑as‑many ------------------------------------------------------------
+            # --------  PHASE 1 : coarse fit‑as‑many ------------------------------------------------------------
             # ---------------------------------------------------------------------------------------------------
             while True:
 
@@ -220,6 +221,7 @@ class AdaptiveTorchClient(TorchClient):
                     except StopIteration:
                         data_it = iter(client_data)
                         batch = next(data_it)
+                    iters_phase1 += recheck
                     
     
                     loss_val, loss_list = self._one_step(
@@ -244,7 +246,7 @@ class AdaptiveTorchClient(TorchClient):
                     break
     
             # ---------------------------------------------------------------------------------------------------
-            # --------  PHASE 3 : fine trade-off ----------------------------------------------------------------
+            # --------  PHASE 2 : fine trade-off ----------------------------------------------------------------
             # ---------------------------------------------------------------------------------------------------
             prev_comp_norm = 0.0
             steps_done_bis = 0
@@ -310,11 +312,13 @@ class AdaptiveTorchClient(TorchClient):
             )
     
             total_wall  = conf.t_download + (curr_t - conf.start_time) + upload_time
+            t_comp_time = (curr_t - conf.start_time)
+            final_keep  = max(keep_frac, min_frac)
     
             # ------------- build compressed update for aggregator ---------
             final_delta = compress_topk(
                 [p.data - w0i for p, w0i in zip(model.parameters(), w0)],
-                max(keep_frac, min_frac)
+                final_keep
             )
             full_sd = model.state_dict()
             k_iter  = iter(final_delta)                      # same order as model.parameters()
@@ -344,6 +348,13 @@ class AdaptiveTorchClient(TorchClient):
                 "utility"      : utility_val,
                 "update_weight": update_dict,
                 "wall_duration": total_wall,
+                "t_dl": float(conf.t_download),
+                "t_comp": float(t_comp_time),
+                "t_ul": float(upload_time),
+                # Bliss specifics
+                "iters_phase1": int(iters_phase1),
+                "iters_phase2": int(steps_done_bis),
+                "dropout_frac": float(1.0 - final_keep),
             }
         except Exception:
             # Full stack‑trace into the executor log

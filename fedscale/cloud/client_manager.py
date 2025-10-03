@@ -637,32 +637,6 @@ class ClientManager:
         return cd
     
 
-    
-
-    
-    # ──────────────────────────────────────────────────────────────
-    #  Check‑point helpers
-    # ──────────────────────────────────────────────────────────────
-    def get_state(self) -> dict:
-        """Pickle‑friendly snapshot of the whole client‑manager state."""
-        return {
-            "client_metadata"   : self.client_metadata,
-            "client_on_hosts"   : self.client_on_hosts,
-            "feasibleClients"   : self.feasibleClients,
-            "feasible_samples"  : self.feasible_samples,
-            "count"             : self.count,
-            "rng_state"         : self.rng.getstate(),
-        }
-
-    def load_state(self, state: dict) -> None:
-        """Restore the snapshot produced by `get_state`."""
-        self.client_metadata   = state["client_metadata"]
-        self.client_on_hosts   = state.get("client_on_hosts", {})
-        self.feasibleClients   = state["feasibleClients"]
-        self.feasible_samples  = state["feasible_samples"]
-        self.count             = state["count"]
-        self.rng.setstate(state["rng_state"])
-
     def get_pacer_state(self):
         if self.mode == "bliss" and hasattr(self, "bliss_sampler"):
             return self.bliss_sampler.get_pacer_state()

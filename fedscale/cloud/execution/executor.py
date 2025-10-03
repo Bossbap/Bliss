@@ -391,7 +391,6 @@ class Executor(object):
         test_results = client.test(
             data_loader, model=self.model_adapter.get_model(), conf=test_config
         )
-        self.log_test_result(test_results)
         gc.collect()
 
         return test_results
@@ -489,21 +488,6 @@ class Executor(object):
                         f"Caught exception {e} from aggregator, terminating executor {self.this_rank} ..."
                     )
                     self.Stop()
-
-    def log_test_result(self, test_res):
-        """Log test results to wandb server if enabled"""
-        acc = round(test_res["top_1"] / test_res["test_len"], 4)
-        acc_5 = round(test_res["top_5"] / test_res["test_len"], 4)
-        test_loss = test_res["test_loss"] / test_res["test_len"]
-        if self.wandb != None:
-            self.wandb.log(
-                {
-                    "Test/round_to_top1_accuracy": acc,
-                    "Test/round_to_top5_accuracy": acc_5,
-                    "Test/round_to_loss": test_loss,
-                },
-                step=self.round,
-            )
 
 
 if __name__ == "__main__":

@@ -50,7 +50,7 @@ class TorchServerOptimizer(object):
             current_model = [x.to(device=self.device) for x in current_model]
 
             diff_weight = self.gradient_controller.update(
-                [pb - pa for pa, pb in zip(last_model, current_model)]
+                [pa - pb for pa, pb in zip(last_model, current_model)]
             )
 
             new_state_dict = {
