@@ -34922,3 +34922,785 @@ I0000 00:00:1760435594.048281  632984 fork_posix.cc:71] Other threads are curren
 I0000 00:00:1760435594.198328  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
 I0000 00:00:1760435594.310171  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
 I0000 00:00:1760435594.424568  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:20 INFO     [aggregator.py:210] [ROUND_SUMMARY] {"round": 187, "clock_end": 65764.55374594225, "duration": 320.39357275987277, "completed": [4985, 1073, 10233, 551, 2213, 1596, 5742, 3019, 155, 5430, 2438, 1777, 3054, 7642, 6328, 976, 2211, 10211, 1377, 2070, 1464, 982, 2522, 2081, 159, 1349, 8256, 280, 3393, 2055, 6603, 158, 4437, 10663, 5925, 3091, 2669, 937, 5099, 5319, 6084, 4752, 1242, 9389, 4075, 3411, 7813, 3259, 2588, 5122, 2933, 1093, 1963, 3106, 9536, 4152, 1447, 6109, 1038, 1910, 1751, 10577, 4979, 6998, 514, 1064, 2329, 469, 1363, 403, 11105, 6295, 6104, 3128, 1714, 5441, 1244, 2991, 7129, 11203, 1222, 5605, 4223, 11091, 5935, 5449, 571, 5310, 1954, 5435, 266, 8470, 2725, 9175, 4546, 4631, 7160, 8445, 3469, 1731], "stragglers": [6564, 10426, 4813, 3585, 5892, 3813, 7308, 9146, 3403, 10929, 10332, 5120, 6828, 10289, 2938, 9535, 9976, 4785, 10563, 7575, 8233, 3817, 2129, 4770, 5113, 3863, 2992, 8567, 6068], "dropped": [], "loss_avg": 2.3111766142104564}
+(10-14) 11:53:20 INFO     [client_manager.py:325] Wall clock time: 65765, 2689 clients online, 5757 clients offline
+(10-14) 11:53:20 INFO     [aggregator.py:1007] Selected 100 participants to run: [1681, 1690, 1033, 1443, 1678, 1504, 820, 6344, 2157, 4166, 1654, 1335, 2544, 8947, 9744, 6295, 4907, 1607, 5029, 4989, 4401, 1076, 1960, 5524, 7261, 1943, 2957, 6389, 10187, 2338, 174, 4271, 148, 9029, 6834, 2650, 7593, 2027, 2143, 3834, 3399, 2827, 3091, 10402, 4655, 1291, 8293, 1535, 5041, 3866, 4687, 10020, 1606, 1331, 6511, 9952, 3218, 4483, 2977, 850, 571, 2714, 11185, 2490, 2314, 3156, 868, 5720, 6564, 3354, 6637, 163, 4753, 3387, 4291, 7872, 1687, 6107, 3206, 8444, 1373, 1276, 11091, 3324, 11197, 5319, 1520, 9254, 2380, 10389, 2698, 7404, 2218, 9187, 1022, 3637, 2137, 10720, 2032, 11093]
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (22)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (8)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (6)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (20)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (21)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (11)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (24)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (12)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (13)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (4)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (9)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (26)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (25)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (16)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (23)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (10)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (19)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (17)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (7)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (27)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (2)
+(10-14) 11:53:21 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (3)
+(10-14) 11:53:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (1)
+(10-14) 11:53:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (15)
+(10-14) 11:53:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (14)
+(10-14) 11:53:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (5)
+(10-14) 11:53:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (18)
+(10-14) 11:53:22 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (22)
+(10-14) 11:53:23 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:53:23 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:53:23 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435603.183841  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435603.202062  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435603.216019  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435603.460380  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435603.664627  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435603.895904  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435603.953994  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435603.967625  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435604.067440  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435604.284799  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435604.483109  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:24 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:53:24 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435604.675517  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435604.688369  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435604.707849  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435604.923507  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435605.143585  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:25 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (8)
+(10-14) 11:53:25 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:25 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (6)
+(10-14) 11:53:25 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:53:26 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:53:26 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (20)
+(10-14) 11:53:26 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (21)
+I0000 00:00:1760435606.458138  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435606.472109  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:26 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435607.186534  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435607.217301  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (11)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (24)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (12)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (13)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (4)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (9)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (26)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (25)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (22)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (16)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (10)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (23)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (19)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (7)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (17)
+(10-14) 11:53:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:53:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (27)
+(10-14) 11:53:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (5)
+(10-14) 11:53:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (18)
+(10-14) 11:53:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (15)
+(10-14) 11:53:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (14)
+I0000 00:00:1760435608.233235  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435608.245775  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (6)
+(10-14) 11:53:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (8)
+(10-14) 11:53:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (20)
+I0000 00:00:1760435608.839490  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435608.870046  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435609.140258  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435609.174510  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:53:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (21)
+(10-14) 11:53:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435609.591948  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435609.606627  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435609.796212  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435609.826414  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.020436  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.035624  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.096465  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.128464  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.437229  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.445666  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.468064  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.479043  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.805336  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.818185  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:30 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435610.931845  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435610.946261  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:31 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:53:31 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435611.231519  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435611.245389  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:32 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (11)
+I0000 00:00:1760435612.027534  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:32 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435612.045029  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435612.071427  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435612.084863  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435612.390765  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435612.405466  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:32 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435612.791418  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435612.804965  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435612.878288  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435612.892368  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (4)
+I0000 00:00:1760435613.124551  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435613.157292  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (12)
+(10-14) 11:53:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (9)
+I0000 00:00:1760435613.259505  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435613.272592  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (13)
+(10-14) 11:53:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (24)
+I0000 00:00:1760435613.617273  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (22)
+I0000 00:00:1760435613.651063  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435613.829279  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435613.844476  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435613.885577  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435613.900295  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (26)
+(10-14) 11:53:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (25)
+I0000 00:00:1760435614.080083  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435614.096539  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (8)
+I0000 00:00:1760435614.303955  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435614.321338  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (15)
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (14)
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (10)
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (19)
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (16)
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (5)
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (7)
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (6)
+I0000 00:00:1760435614.739655  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (17)
+I0000 00:00:1760435614.774265  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (11)
+(10-14) 11:53:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (21)
+(10-14) 11:53:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (20)
+(10-14) 11:53:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (27)
+(10-14) 11:53:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (23)
+(10-14) 11:53:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (12)
+(10-14) 11:53:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:53:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (18)
+I0000 00:00:1760435615.669717  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435615.679274  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435615.684401  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435615.711407  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (9)
+(10-14) 11:53:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (4)
+(10-14) 11:53:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435616.098654  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435616.113594  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435616.493624  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435616.508591  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:36 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435616.903923  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435616.917354  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435617.021018  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435617.037775  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:37 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (24)
+(10-14) 11:53:37 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:37 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (22)
+I0000 00:00:1760435617.337912  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435617.370803  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:37 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (13)
+I0000 00:00:1760435617.564843  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435617.579276  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435617.742639  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435617.754142  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435617.951482  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435617.985877  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:53:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435618.249028  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435618.281568  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435618.430341  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435618.464853  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (26)
+I0000 00:00:1760435618.557587  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435618.576682  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (25)
+(10-14) 11:53:39 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:39 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (8)
+(10-14) 11:53:39 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:53:39 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435619.729045  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435619.762273  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:40 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (15)
+I0000 00:00:1760435620.030389  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435620.042161  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435620.303442  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435620.334181  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:40 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435620.578338  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435620.611126  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435620.645208  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435620.661101  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435620.869811  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435620.886021  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435621.089955  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435621.108809  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435621.471797  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435621.485706  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:43 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:53:43 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:43 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435623.929104  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435623.988391  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435624.004721  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435624.016251  632738 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435624.063391  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435624.200383  632738 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435624.258210  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435624.515146  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435624.694802  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435625.097077  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435625.268115  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435625.411494  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435625.564467  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435625.747844  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:50 INFO     [aggregator.py:210] [ROUND_SUMMARY] {"round": 188, "clock_end": 66097.92797509764, "duration": 333.37422915539355, "completed": [1690, 1033, 1443, 1504, 1678, 6344, 4166, 1654, 8947, 6389, 174, 3091, 3399, 2143, 10402, 4655, 1681, 1291, 1535, 1335, 820, 2544, 2157, 5041, 9744, 5029, 4907, 4989, 1606, 850, 3218, 6107, 1607, 6295, 1960, 7872, 4401, 1276, 1076, 11091, 2027, 11197, 9254, 2380, 6834, 7404, 7261, 2650, 2957, 148, 4271, 3866, 1022, 8293, 2338, 5524, 7593, 2827, 2137, 9187, 10187, 10020, 1943, 1331, 3834, 4687, 571, 2032, 6511, 9952, 2977, 9029, 10720, 2714, 11093, 4483, 868, 1373, 11185, 6637, 2314, 4291, 3156, 2490, 3387, 3324, 5720, 163, 1687, 6564, 3354, 8444, 2698, 4753, 5319, 2218, 3206, 1520, 10389, 3637], "stragglers": [1638, 4180, 7145, 4984, 8169, 2192, 1902, 5273, 4516, 6643, 8842, 5571, 5498, 11129, 5160, 1182, 4292, 10900, 3693, 10188, 1561, 3776, 4185, 4336, 5090, 11080], "dropped": [], "loss_avg": 2.549324625983638}
+(10-14) 11:53:50 INFO     [client_manager.py:325] Wall clock time: 66098, 2704 clients online, 5742 clients offline
+(10-14) 11:53:51 INFO     [aggregator.py:1007] Selected 100 participants to run: [882, 2625, 5147, 2395, 543, 4497, 963, 2610, 4907, 548, 1518, 1302, 7711, 6177, 10922, 5929, 7101, 2944, 7239, 4839, 181, 4413, 2724, 1592, 9659, 8215, 2489, 498, 4495, 5122, 4329, 2546, 3885, 2412, 1504, 2260, 3391, 4929, 1490, 2820, 3877, 4624, 9978, 1370, 4129, 1447, 4173, 940, 8447, 6636, 3361, 5284, 6107, 1767, 7419, 3307, 2486, 5257, 3617, 263, 8128, 9734, 8678, 4157, 5627, 8955, 8056, 6018, 6351, 1241, 3206, 3763, 79, 3174, 2241, 5599, 153, 2530, 5062, 8271, 3731, 1851, 8444, 4014, 1009, 1918, 1480, 475, 5146, 4940, 5736, 1103, 8465, 3903, 11091, 5892, 7297, 4277, 3205, 6870]
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (10)
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (24)
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (13)
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (27)
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (7)
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (21)
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (26)
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (15)
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (12)
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (6)
+(10-14) 11:53:51 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (17)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (9)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (25)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (1)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (3)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (14)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (2)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (4)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (5)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (11)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (20)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (19)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (23)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (22)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (8)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (16)
+(10-14) 11:53:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (18)
+(10-14) 11:53:53 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:53 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435633.417027  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:53 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435633.456027  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435633.464916  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435633.478514  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435634.700751  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435634.713743  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435634.766621  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435634.797684  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:54 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:55 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435635.034423  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435635.069176  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:55 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435635.322612  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435635.341157  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435635.451502  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435635.466218  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435636.000341  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435636.011699  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:56 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (10)
+(10-14) 11:53:56 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:56 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (24)
+(10-14) 11:53:56 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:53:56 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (13)
+(10-14) 11:53:56 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (27)
+I0000 00:00:1760435636.744436  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435636.757449  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:56 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:53:56 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (7)
+(10-14) 11:53:57 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (21)
+(10-14) 11:53:57 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (26)
+(10-14) 11:53:57 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (15)
+(10-14) 11:53:57 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (12)
+(10-14) 11:53:57 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (6)
+(10-14) 11:53:57 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (17)
+(10-14) 11:53:57 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (9)
+(10-14) 11:53:57 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:57 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (25)
+(10-14) 11:53:57 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435637.979947  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435637.998525  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (14)
+I0000 00:00:1760435638.066632  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435638.083674  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (4)
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (5)
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (11)
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (20)
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (19)
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (8)
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (23)
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (16)
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (22)
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (18)
+(10-14) 11:53:58 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435638.964384  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435638.976504  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435639.078572  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435639.092754  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:53:59 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:53:59 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435639.467138  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435639.654621  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435639.828586  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435639.839715  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435639.841682  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435640.034442  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435640.228398  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435640.421860  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:00 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435640.459295  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435640.491106  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:00 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (10)
+I0000 00:00:1760435640.594396  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435640.820965  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435641.032788  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:01 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435641.175593  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:01 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (24)
+(10-14) 11:54:01 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:54:01 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (13)
+(10-14) 11:54:01 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (27)
+(10-14) 11:54:01 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (21)
+(10-14) 11:54:01 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (7)
+(10-14) 11:54:02 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:54:02 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (15)
+(10-14) 11:54:02 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (26)
+(10-14) 11:54:02 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:02 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (12)
+(10-14) 11:54:02 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (6)
+(10-14) 11:54:03 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (17)
+I0000 00:00:1760435643.155484  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435643.187342  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:03 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:54:03 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (25)
+(10-14) 11:54:03 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:54:03 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (9)
+(10-14) 11:54:03 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (20)
+(10-14) 11:54:03 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (4)
+I0000 00:00:1760435643.865507  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435643.876683  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:03 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (14)
+(10-14) 11:54:04 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:04 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (11)
+I0000 00:00:1760435644.124257  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435644.329138  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:04 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (23)
+(10-14) 11:54:04 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (8)
+I0000 00:00:1760435644.552208  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435644.579458  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:04 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (5)
+I0000 00:00:1760435644.615345  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:04 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (18)
+I0000 00:00:1760435644.789288  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:04 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (16)
+(10-14) 11:54:04 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (19)
+I0000 00:00:1760435645.054183  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:05 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435645.218478  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435645.247137  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435645.250917  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:05 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (22)
+I0000 00:00:1760435645.505111  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:05 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (10)
+(10-14) 11:54:05 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:05 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435645.884458  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435645.898568  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:06 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (13)
+(10-14) 11:54:06 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (24)
+I0000 00:00:1760435646.783116  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:06 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (21)
+I0000 00:00:1760435646.797881  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:06 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (7)
+(10-14) 11:54:06 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (27)
+(10-14) 11:54:07 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (26)
+(10-14) 11:54:07 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:07 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435647.425709  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435647.427391  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435647.440271  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:07 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (12)
+(10-14) 11:54:07 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (6)
+(10-14) 11:54:07 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435647.672100  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435647.743825  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:07 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (15)
+I0000 00:00:1760435647.777586  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435647.857847  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:08 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (17)
+I0000 00:00:1760435648.104837  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435648.136039  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435648.167683  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:08 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (25)
+I0000 00:00:1760435648.462502  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435648.646979  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435648.678670  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435648.761335  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:08 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (4)
+(10-14) 11:54:08 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:54:08 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (9)
+I0000 00:00:1760435649.017649  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:09 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435649.140410  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:09 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (20)
+I0000 00:00:1760435649.180424  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:09 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (14)
+(10-14) 11:54:09 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435649.551729  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435649.566244  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435649.613376  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435649.625800  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:09 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (11)
+I0000 00:00:1760435650.142043  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435650.162427  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:10 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:10 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (23)
+I0000 00:00:1760435650.474273  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435650.479373  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:10 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (8)
+I0000 00:00:1760435650.516125  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:10 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435650.690818  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435650.856587  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435651.025904  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435651.167194  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435651.288861  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435651.437488  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435651.591927  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435651.718888  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435651.943063  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:20 INFO     [aggregator.py:210] [ROUND_SUMMARY] {"round": 189, "clock_end": 66456.78118881863, "duration": 358.85321372098406, "completed": [882, 2625, 5147, 2395, 543, 4497, 2610, 548, 7711, 4413, 1592, 2260, 4929, 3391, 1490, 3877, 9978, 940, 3361, 963, 2486, 4907, 1518, 9734, 7419, 1302, 10922, 6177, 7101, 5929, 79, 3174, 2944, 7239, 1241, 4839, 2724, 181, 4495, 8215, 1009, 3731, 9659, 1851, 498, 1103, 2546, 4329, 4940, 5122, 1504, 2489, 11091, 2820, 2412, 1370, 7297, 3885, 4624, 4129, 6018, 6870, 6107, 4173, 8056, 3617, 8955, 1447, 8447, 5257, 6636, 4157, 5284, 3307, 263, 3763, 1767, 6351, 5627, 8128, 8678, 5599, 4014, 8271, 3206, 2241, 153, 1918, 2530, 8465, 5062, 8444, 5736, 475, 4277, 1480, 5146, 3205, 3903, 5892], "stragglers": [9369, 7490, 1429, 7923, 7550, 2667, 9104, 4732, 3102, 3450, 3362, 3809, 2992, 6733, 3676, 2276, 10114, 3291, 6655, 6208, 6846, 8233, 5210, 7583, 3734, 3529, 55], "dropped": [], "loss_avg": 2.4581208874264697}
+(10-14) 11:54:20 INFO     [client_manager.py:325] Wall clock time: 66457, 2722 clients online, 5724 clients offline
+(10-14) 11:54:22 INFO     [aggregator.py:1007] Selected 100 participants to run: [1033, 884, 758, 3984, 2330, 2354, 9285, 8204, 2159, 872, 2775, 1835, 1727, 6172, 5110, 2079, 5368, 1664, 5444, 1560, 1661, 3423, 1382, 10645, 5944, 7162, 922, 5649, 2609, 9362, 5099, 486, 5083, 9867, 9160, 5156, 4753, 11059, 1720, 280, 1200, 571, 3218, 6937, 9344, 966, 10365, 9429, 10304, 2486, 2718, 1060, 1484, 4235, 5287, 2130, 10988, 1331, 10614, 7862, 11131, 81, 5650, 2933, 855, 3551, 9015, 4806, 7647, 6420, 6138, 2661, 10206, 1302, 2287, 6682, 1103, 6524, 3870, 2189, 4949, 4535, 5213, 7894, 5887, 216, 7380, 6896, 5994, 3404, 4983, 4559, 6948, 9634, 2508, 3010, 2400, 264, 7040, 5013]
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (5)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (10)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (3)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (2)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (16)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (15)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (6)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (18)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (7)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (20)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (27)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (12)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (9)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (25)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (23)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (17)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (19)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (4)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (8)
+(10-14) 11:54:22 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (26)
+(10-14) 11:54:23 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (14)
+(10-14) 11:54:23 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (11)
+(10-14) 11:54:23 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (22)
+(10-14) 11:54:23 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (13)
+(10-14) 11:54:23 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (1)
+(10-14) 11:54:23 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (24)
+(10-14) 11:54:23 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (21)
+(10-14) 11:54:23 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:23 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435663.498921  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435663.513373  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435664.102442  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435664.113874  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:24 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435664.450875  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435664.467073  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:24 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:24 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435665.037589  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435665.043116  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435665.057020  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435665.069454  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435665.576818  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435665.590598  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:25 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:54:25 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (5)
+I0000 00:00:1760435665.875997  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435665.907198  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435666.177588  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435666.210568  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435666.294976  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435666.309594  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:26 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:54:26 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:26 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:54:26 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (10)
+I0000 00:00:1760435666.957631  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435666.972539  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435667.247377  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435667.282986  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:27 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (16)
+I0000 00:00:1760435667.580536  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435667.592035  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (15)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (6)
+I0000 00:00:1760435668.184513  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435668.201620  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (18)
+I0000 00:00:1760435668.240496  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435668.255136  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (7)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (20)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (27)
+I0000 00:00:1760435668.526604  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435668.539580  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (12)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (9)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (25)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (23)
+I0000 00:00:1760435668.765402  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (17)
+I0000 00:00:1760435668.797509  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (4)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (19)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (8)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (26)
+(10-14) 11:54:28 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (11)
+I0000 00:00:1760435669.034701  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (14)
+I0000 00:00:1760435669.068946  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (22)
+(10-14) 11:54:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (24)
+(10-14) 11:54:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (13)
+I0000 00:00:1760435669.124022  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (21)
+I0000 00:00:1760435669.142350  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (5)
+I0000 00:00:1760435669.373631  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435669.387083  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (10)
+(10-14) 11:54:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:29 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435669.954026  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435669.969470  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:30 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (16)
+(10-14) 11:54:30 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:54:31 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435671.173928  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435671.192946  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:31 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435671.926093  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435671.954145  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435671.990373  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435672.023894  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:32 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (15)
+(10-14) 11:54:32 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:54:32 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435672.790402  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435672.803630  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435672.804954  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435672.815899  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:32 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (6)
+(10-14) 11:54:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+I0000 00:00:1760435673.116529  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435673.132007  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435673.318656  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435673.325600  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435673.359994  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (7)
+(10-14) 11:54:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (20)
+I0000 00:00:1760435673.574753  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (27)
+(10-14) 11:54:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (18)
+I0000 00:00:1760435673.702924  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435673.717138  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435673.754504  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:33 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (12)
+I0000 00:00:1760435674.041912  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435674.046131  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435674.055907  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+(10-14) 11:54:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (9)
+I0000 00:00:1760435674.244061  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:54:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (4)
+I0000 00:00:1760435674.459561  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (25)
+I0000 00:00:1760435674.631367  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435674.644232  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (17)
+(10-14) 11:54:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:34 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (14)
+I0000 00:00:1760435674.957721  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435675.044137  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (23)
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (19)
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (5)
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (26)
+I0000 00:00:1760435675.289380  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (24)
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (13)
+I0000 00:00:1760435675.322518  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (11)
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (8)
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (21)
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (22)
+I0000 00:00:1760435675.545629  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (16)
+(10-14) 11:54:35 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435675.640547  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435675.724539  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435675.785013  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435675.962742  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435675.992531  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:36 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (10)
+I0000 00:00:1760435676.236966  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435676.281811  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:36 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435676.533858  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435676.678174  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:36 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:36 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (15)
+I0000 00:00:1760435676.943707  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435676.955833  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:36 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435676.986447  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435677.237560  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435677.412926  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435677.443240  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435677.461394  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:37 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (6)
+I0000 00:00:1760435677.766383  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:37 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (7)
+(10-14) 11:54:37 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (20)
+I0000 00:00:1760435678.065641  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (18)
+(10-14) 11:54:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (27)
+I0000 00:00:1760435678.312465  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (12)
+I0000 00:00:1760435678.492705  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435678.505766  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:54:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (9)
+I0000 00:00:1760435678.629435  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435678.664127  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435678.711138  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435678.724476  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:38 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435679.133504  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435679.145724  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435679.199301  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:39 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (4)
+I0000 00:00:1760435679.236733  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435679.432644  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435679.448641  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435679.897371  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435679.910026  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:39 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+(10-14) 11:54:40 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (25)
+(10-14) 11:54:40 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (3)
+(10-14) 11:54:40 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (17)
+(10-14) 11:54:40 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435680.478953  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:40 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (14)
+I0000 00:00:1760435680.888524  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435681.148198  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:41 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (5)
+I0000 00:00:1760435681.419312  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:41 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (1)
+I0000 00:00:1760435681.657277  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435681.704284  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435681.738613  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:41 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (2)
+I0000 00:00:1760435681.888238  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435682.192742  632984 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435682.707156  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+I0000 00:00:1760435682.720829  632493 fork_posix.cc:71] Other threads are currently calling into gRPC, skipping fork() handlers
+(10-14) 11:54:43 INFO     [aggregator.py:1325] Issue EVENT (client_train) to EXECUTOR (23)
+(10-14) 11:54:51 INFO     [aggregator.py:210] [ROUND_SUMMARY] {"round": 190, "clock_end": 66877.03190427885, "duration": 420.2507154602208, "completed": [1033, 884, 758, 2330, 3984, 2354, 2159, 8204, 872, 6172, 2079, 1382, 1720, 280, 6937, 571, 3218, 966, 10365, 9285, 2775, 10304, 1835, 5287, 1727, 10988, 5110, 11131, 1302, 1664, 5444, 1560, 5368, 1661, 1103, 3423, 6682, 3870, 922, 10645, 7162, 486, 7380, 7894, 5994, 4753, 4983, 2508, 5944, 5649, 1200, 5099, 9362, 7040, 9160, 5156, 6948, 5083, 264, 2609, 9867, 2486, 9344, 1484, 11059, 2130, 2718, 855, 10614, 1060, 4235, 7862, 9429, 1331, 7647, 81, 5650, 10206, 4806, 2661, 6138, 3551, 2933, 6420, 9015, 6524, 4949, 6896, 5213, 2287, 5887, 4559, 216, 4535, 9634, 2400, 2189, 3010, 3404, 5013], "stragglers": [8273, 5265, 2603, 7461, 6557, 3362, 4136, 10594, 6507, 4327, 393, 4607, 4212, 3102, 3674, 3205, 6655, 4820, 8936, 6871, 3461, 6313, 5897, 4940, 6723, 212, 7308, 514], "dropped": [], "loss_avg": 2.2794382566527815}
+(10-14) 11:54:51 INFO     [client_manager.py:325] Wall clock time: 66877, 2732 clients online, 5714 clients offline
+(10-14) 11:54:52 INFO     [aggregator.py:1007] Selected 100 participants to run: [3984, 5538, 924, 3394, 3834, 3415, 6351, 4048, 3448, 2074, 5444, 2794, 1753, 5681, 1687, 7248, 6756, 1987, 1496, 1076, 8838, 2063, 11239, 1286, 4471, 1613, 1462, 2621, 6998, 173, 10622, 2363, 9855, 543, 148, 2677, 5539, 10645, 5122, 4530, 5284, 1017, 4237, 1484, 2260, 1696, 2232, 5359, 4418, 1607, 3875, 8216, 5925, 2669, 5099, 2339, 850, 1660, 192, 9342, 1064, 4985, 1690, 6776, 4271, 3361, 1638, 2412, 10711, 2975, 2617, 9876, 1212, 1412, 1283, 7267, 5310, 7160, 10758, 496, 2940, 940, 9332, 893, 3206, 9126, 2224, 7535, 3729, 10294, 4014, 216, 3915, 10098, 6284, 6296, 7321, 5519, 8959, 4770]
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (21)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (9)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (3)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (1)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (11)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (2)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (6)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (14)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (23)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (4)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (18)
+(10-14) 11:54:52 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (26)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (10)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (19)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (8)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (27)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (25)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (24)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (15)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (12)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (20)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (16)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (13)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (22)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (7)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (17)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (update_model) to EXECUTOR (5)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (3)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (2)
+(10-14) 11:54:53 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (1)
+(10-14) 11:54:57 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (21)
+(10-14) 11:54:57 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (9)
+(10-14) 11:54:57 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (11)
+(10-14) 11:54:58 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (6)
+(10-14) 11:54:58 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (14)
+(10-14) 11:54:58 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (4)
+(10-14) 11:54:58 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (23)
+(10-14) 11:54:58 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (18)
+(10-14) 11:54:58 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (26)
+(10-14) 11:54:58 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (10)
+(10-14) 11:54:58 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (19)
+(10-14) 11:54:58 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (8)
+(10-14) 11:54:59 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (27)
+(10-14) 11:54:59 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (25)
+(10-14) 11:54:59 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (24)
+(10-14) 11:54:59 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (15)
+(10-14) 11:54:59 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (12)
+(10-14) 11:54:59 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (16)
+(10-14) 11:54:59 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (17)
+(10-14) 11:55:00 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (13)
+(10-14) 11:55:00 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (22)
+(10-14) 11:55:00 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (20)
+(10-14) 11:55:00 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (5)
+(10-14) 11:55:00 INFO     [aggregator.py:1325] Issue EVENT (model_test) to EXECUTOR (7)
