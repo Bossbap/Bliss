@@ -89,6 +89,10 @@ parser.add_argument("--loss_decay", type=float, default=0.2)
 parser.add_argument("--exploration_min", type=float, default=0.3)
 parser.add_argument("--cut_off_util", type=float, default=0.05)  # 95 percentile
 
+# OpenImg preprocessing control: choose image side length
+# Default 96 to match Oort paper preprocessing; set 256 to use legacy FedScale
+parser.add_argument("--openimg_size", type=int, default=96)
+
 parser.add_argument("--gradient_policy", type=str, default=None)
 
 # for yogi
@@ -128,13 +132,19 @@ parser.add_argument("--target_delta", type=float, default=0.0001)
 # Round checkpoint
 
 # for Oort
-parser.add_argument("--pacer_delta", type=float, default=5)
+parser.add_argument("--t_budget", type=int,   default=300)
+parser.add_argument("--pacer_delta", type=float, default=50)
 parser.add_argument("--pacer_step", type=int, default=20)
 parser.add_argument("--exploration_alpha", type=float, default=0.3)
 parser.add_argument("--exploration_factor", type=float, default=0.9)
 parser.add_argument("--exploration_decay", type=float, default=0.98)
 parser.add_argument("--sample_window", type=float, default=20.0)
-parser.add_argument("--round_threshold", type=float, default=30)
+parser.add_argument(
+    "--round_threshold",
+    type=float,
+    default=30,
+    help="Legacy percentile pacer threshold (kept for compatibility; current Oort pacer uses t_budget).",
+)
 parser.add_argument("--round_penalty", type=float, default=2.0)
 
 # for PyramidFL
@@ -211,10 +221,10 @@ parser.add_argument("--collect_data",            type=bool,   default=False, hel
 
 # local training strategy
 parser.add_argument("--adaptive_training",                 type=bool,   default=False)
-parser.add_argument("--t_budget",                          type=int,   default=300)
 parser.add_argument("--budget_recheck_steps",              type=int,   default=5)
 parser.add_argument("--ewma_lambda",                       type=float,   default=0.7)
 parser.add_argument("--min_payload_frac",                  type=float,   default=0.3)
+parser.add_argument("--run_phase_2",                       type=bool,   default=True)
 
 
 # for albert

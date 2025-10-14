@@ -755,3 +755,87 @@ class _training_selector:
             "pred_unseen":           dict(self._last_pred_unseen),
         }
     
+# -----------------------------------------------------------------------------
+# Internal helper functions
+# -----------------------------------------------------------------------------
+
+def _extract_hyperparams(args, model_name: str, head: str) -> dict:
+    """
+    Build a hyper-parameter dict for a given <model_name> and head ('g' or 'h').
+
+    * Scans all attributes of `args`.
+    * Keeps only those whose flag starts with  "<model_name>_<head>_".
+    * Strips that prefix when storing the key in the returned dict.
+    * Converts comma-separated strings like "128,64" into a list of ints.
+
+    Example
+    -------
+    args.xgboost_g_learning_rate  -> {'learning_rate': 0.05}
+    args.mlp_h_hidden_layer_sizes "128,64" -> {'hidden_sizes': [128, 64]}
+    """
+    model_name = (model_name or "").lower()
+    prefix = f"{model_name}_{head.lower()}_"
+    out = {}
+
+    for k, v in vars(args).items():
+        if k.startswith(prefix):
+            hp_key = k[len(prefix):]            # drop the prefix
+            # special parsing: "128,64" -> (128, 64)
+            if isinstance(v, str) and "," in v and hp_key.endswith("sizes"):
+                v = tuple(v)
+            # drop unset *bool* flags that remain False
+            if isinstance(v, bool) and v is False:
+                continue
+            out[hp_key] = v
+    return out
+
+# -----------------------------------------------------------------------------
+# Testing selector – shape compatible with Oort.  *Mostly placeholder*
+# -----------------------------------------------------------------------------
+
+def create_testing_selector(
+    data_distribution: Optional[Dict[Any, Any]] = None,
+    client_info: Optional[Dict[int, Sequence[float]]] = None,
+    model_size: Optional[int] = None,
+):
+    """Factory for the testing selector (currently unused for Bliss)."""
+    return _testing_selector(data_distribution, client_info, model_size)
+
+class _testing_selector:  # noqa: D401 – keep Oort naming
+    """Bliss testing‑phase participant selector (stub)."""
+
+    def __init__(
+        self,
+        data_distribution: Optional[Dict[Any, Any]] = None,
+        client_info: Optional[Dict[int, Sequence[float]]] = None,
+        model_size: Optional[int] = None,
+    ) -> None:
+        self.data_distribution = data_distribution or {}
+        self.client_info = client_info or {}
+        self.model_size = model_size or 0
+        self.client_idx_list = list(self.client_info.keys()) if self.client_info else []
+        logging.debug("[Bliss/TestSel] initialised with %d clients", len(self.client_info))
+
+    # ------- API stubs --------------------------------------------------
+
+    def select_by_deviation(
+        self,
+        dev_target: float,
+        range_of_capacity: Tuple[float, float],
+        total_num_clients: int,
+        confidence: float = 0.8,
+        overcommit: float = 1.1,
+    ) -> int:  # noqa: D401 – keep Oort signature
+        # Very simple Hoeffding bound clone
+        low, high = range_of_capacity
+        rng = high - low
+        m = int((rng**2) * np.log(2 / (1 - confidence)) / (2 * (dev_target**2)))
+        return int(np.ceil(m * overcommit))
+
+    def select_by_category(
+        self,
+        request_list: List[Dict[str, Any]],
+        max_num_clients: Optional[int] = None,
+        greedy_heuristic: bool = True,
+    ) -> Tuple[List[int], float, float]:
+        raise NotImplementedError("Category‑aware testing not implemented for Bliss yet.")

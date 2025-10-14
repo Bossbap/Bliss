@@ -50,6 +50,7 @@ job_conf:
     - clock_factor: 30
     - model: resnet34                            # Models: e.g., shufflenet_v2_x2_0, mobilenet_v2, resnet34, albert-base-v2
     - gradient_policy: fed-prox                 # {"fed-yogi", "fed-prox", "fed-avg"}, "fed-avg" by default
+    - proxy_mu: 0.001
 
     - num_participants: 100                      # Number of participants per round, we use K=100 in our paper, large K will be much slower
     - eval_interval: 5                     # How many rounds to run a testing on the testing set
@@ -60,5 +61,5 @@ job_conf:
     - learning_rate: 0.02
     - decay_factor: 0.9
     - decay_round: 10
-    - weight_decay: 5e-4
+    - weight_decay: 8e-5
     - test_bsz: 20

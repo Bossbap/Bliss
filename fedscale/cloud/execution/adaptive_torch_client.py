@@ -46,6 +46,7 @@ class AdaptiveTorchClient(TorchClient):
 
     def __init__(self, args):
         super().__init__(args)
+        self._fedprox_w_t = None  # snapshot for FedProx
 
     # ------------------------------------------------------------------ #
     # Helpers                                                            #
@@ -75,7 +76,7 @@ class AdaptiveTorchClient(TorchClient):
             nxt  = t - (t % WINDOW) + (ts[idx] if idx < len(ts) else WINDOW)
             dt   = min(rem_ops / speed, nxt - t)
 
-            # ---- 60‑second watchdog --------------------------------------- ▲
+            # ---- 60-second watchdog --------------------------------------- ▲
             if not warned and time.time() - t0_real > 60:
                 logging.warning("[simulate_compute] cid=?  "
                                 "t=%.2f  rem_ops=%.2e  speed=%.2e  "
@@ -94,11 +95,10 @@ class AdaptiveTorchClient(TorchClient):
     @staticmethod
     def sample_round_noise(target_mean: float = 0.9, sigma: float = 0.25):
         """One log-normal noise multiplier per round (σ from original code)."""
-        # Noise
         mu = np.log(target_mean) - (sigma**2)/2
         return np.random.lognormal(mean=mu, sigma=sigma)
 
-    # ------- one SGD step (unchanged except signature) ----------------- #
+    # ------- one SGD step (FedProx added) ------------------------------ #
     def _one_step(self, batch, conf, model, optim, crit, tokenizer):
         if conf.task == 'nlp':
             (data, _) = batch
@@ -141,16 +141,27 @@ class AdaptiveTorchClient(TorchClient):
             loss = crit(model(data), target)
 
         # ensure scalar loss for autograd
-        if loss.dim() != 0:                 
-            loss_mean = loss.mean()         
+        if loss.dim() != 0:
+            loss_mean = loss.mean()
             loss_vec  = loss.detach().view(-1)
-        else:                               
-            loss_mean = loss                 
+        else:
+            loss_mean = loss
             loss_vec  = loss.detach().view(1)
-
 
         optim.zero_grad()
         loss_mean.backward()
+
+        # ---------------- FedProx gradient correction ------------------- #
+        # Add μ * (w - w_t) to gradients BEFORE optimizer.step().
+        if getattr(conf, 'gradient_policy', '') == 'fed-prox' and self._fedprox_w_t is not None:
+            mu = float(getattr(conf, 'proxy_mu', 0.0) or 0.0)
+            if mu != 0.0:
+                with torch.no_grad():
+                    for p, p0 in zip(model.parameters(), self._fedprox_w_t):
+                        if p.grad is not None:
+                            p.grad.add_(mu * (p.data - p0))
+        # ---------------------------------------------------------------- #
+
         optim.step()
         return loss_mean.item(), loss_vec.cpu().tolist()
 
@@ -158,40 +169,65 @@ class AdaptiveTorchClient(TorchClient):
     @overrides
     def train(self, client_data, model, conf):
         try:
-            # ----------- initialise round‑specific state -------------------
+            # ----------- initialise round-specific state -------------------
             trace         = conf.dynamic_trace
             tokenizer     = getattr(conf, "tokenizer", None)
             model         = model.to(self.device).train()
             optim         = self.get_optimizer(model, conf)
             crit          = self.get_criterion(conf)
-    
+
+            # --- FedProx: snapshot global weights w_t (once per round) ---
+            if getattr(conf, 'gradient_policy', '') == 'fed-prox':
+                self._fedprox_w_t = [p.detach().clone().to(self.device) for p in model.parameters()]
+            else:
+                self._fedprox_w_t = None
+            # -------------------------------------------------------------- #
+
             round_noise   = self.sample_round_noise(target_mean = 0.9, sigma = 0.25)
 
             flops_step    = conf.model_amount_parameters * conf.batch_size * 3.0
             recheck       = max(1, conf.budget_recheck_steps)          # “E”
-            reduction     = 0.5                                        # hard‑coded
+            reduction     = 0.5                                        # hard-coded
             min_frac      = conf.min_payload_frac
             clock         = conf.clock_factor
+            run_phase_2   = bool(getattr(conf, "run_phase_2", True))
 
-    
             curr_t        = conf.start_time            # includes download
             budget        = conf.t_budget_train        # = t_budget – t_download
             keep_frac     = 1.0                        # start with full payload
-    
+
             steps_done    = 0
             iters_phase1  = 0
             self.loss_sq_sum  = 0.0
             self.seen_samples = 0
             ewma          = 0.0
             λ             = conf.ewma_lambda
-    
+
             # snapshot of initial weights for delta calculation
             w0 = [p.data.clone() for p in model.parameters()]
             data_it = iter(client_data)
-    
+
+            # pre-compute activity boundaries for mid-round checks
+            act = trace['active']; ina = trace['inactive']
+            boundaries = sorted([(ts, 'a') for ts in act] + [(ts, 'i') for ts in ina])
+            phase0 = 'a' if (act and act[0] == 0) else 'i'
+
+            def check_active(tnow: float) -> bool:
+                if not boundaries:
+                    return False
+                T = 48 * 3600
+                tt = tnow % T
+                phase = phase0
+                for ts, _ in boundaries[1:]:
+                    if tt < ts:
+                        break
+                    phase = 'i' if phase == 'a' else 'a'
+                return phase == 'a'
+
             # ---------------------------------------------------------------------------------------------------
-            # --------  PHASE 1 : coarse fit‑as‑many ------------------------------------------------------------
+            # --------  PHASE 1 : coarse fit-as-many ------------------------------------------------------------
             # ---------------------------------------------------------------------------------------------------
+            leftover_steps_after_p1 = 0
             while True:
 
                 speed_now   = compute_speed(trace, curr_t, round_noise)
@@ -200,21 +236,37 @@ class AdaptiveTorchClient(TorchClient):
                 t_comm_est  = (conf.model_size * clock * keep_frac / reduction) / max(up_rate_now, 1e-6)
                 
                 if budget <= t_comm_est:
+                    leftover_steps_after_p1 = 0
                     break
-    
+
                 max_iters   = int((budget - t_comm_est) // t_comp_est)
 
-
                 if max_iters < recheck:
-                    break                            # switch to phase 3
-    
+                    leftover_steps_after_p1 = max(0, max_iters)
+                    break                            # switch to phase 3
+
                 # ---- run exactly `recheck` iterations, simulate real time -
                 elapsed = self._simulate_compute(trace, curr_t, recheck,
                                                 flops_step, round_noise, clock)
 
                 curr_t  += elapsed
                 budget  -= elapsed
-    
+
+                if not check_active(curr_t):
+                    t_comp_time = (curr_t - conf.start_time)
+                    return {
+                        "client_id": conf.client_id,
+                        "moving_loss": self.epoch_train_loss,
+                        "trained_size": steps_done * conf.batch_size,
+                        "success": False,
+                        "utility": 0.0,
+                        "update_weight": {},
+                        "wall_duration": float(conf.t_download + t_comp_time),
+                        "t_dl": float(conf.t_download),
+                        "t_comp": float(t_comp_time),
+                        "t_ul": 0.0,
+                    }
+
                 for i in range(recheck):
                     try:
                         batch = next(data_it)
@@ -222,14 +274,13 @@ class AdaptiveTorchClient(TorchClient):
                         data_it = iter(client_data)
                         batch = next(data_it)
                     iters_phase1 += recheck
-                    
-    
+
                     loss_val, loss_list = self._one_step(
                         batch, conf, model, optim, crit, tokenizer)
                     self.loss_sq_sum  += sum(l**2 for l in loss_list)
                     self.seen_samples += len(loss_list)
-    
-                    # --- loss‑tracking identical to TorchClient ----------
+
+                    # --- loss-tracking identical to TorchClient ----------
                     if steps_done < len(client_data):
                         if self.epoch_train_loss == 1e-4:
                             self.epoch_train_loss = loss_val
@@ -237,73 +288,122 @@ class AdaptiveTorchClient(TorchClient):
                             self.epoch_train_loss = \
                                 (1-conf.loss_decay)*self.epoch_train_loss   +\
                                 conf.loss_decay * loss_val
-    
+
                     steps_done        += 1
                     self.completed_steps = steps_done
-    
-                # (exact‑equal case): exit now if we just consumed the last chunk
+
+                # (exact-equal case): exit now if we just consumed the last chunk
                 if max_iters == recheck:
+                    leftover_steps_after_p1 = 0
                     break
-    
+
+            if not run_phase_2 and leftover_steps_after_p1 > 0:
+                elapsed = self._simulate_compute(
+                    trace, curr_t, leftover_steps_after_p1,
+                    flops_step, round_noise, clock
+                )
+                curr_t  += elapsed
+                budget  -= elapsed
+
+                for _ in range(leftover_steps_after_p1):
+                    try:
+                        batch = next(data_it)
+                    except StopIteration:
+                        data_it = iter(client_data)
+                        batch = next(data_it)
+
+                    loss_val, loss_list = self._one_step(
+                        batch, conf, model, optim, crit, tokenizer)
+                    self.loss_sq_sum  += sum(l**2 for l in loss_list)
+                    self.seen_samples += len(loss_list)
+
+                    if steps_done < len(client_data):
+                        if self.epoch_train_loss == 1e-4:
+                            self.epoch_train_loss = loss_val
+                        else:
+                            self.epoch_train_loss = \
+                                (1-conf.loss_decay)*self.epoch_train_loss   +\
+                                conf.loss_decay * loss_val
+
+                    steps_done       += 1
+                    iters_phase1     += 1
+                    self.completed_steps = steps_done
+
             # ---------------------------------------------------------------------------------------------------
-            # --------  PHASE 2 : fine trade-off ----------------------------------------------------------------
+            # --------  PHASE 2 : fine trade-off ----------------------------------------------------------------
             # ---------------------------------------------------------------------------------------------------
             prev_comp_norm = 0.0
             steps_done_bis = 0
-    
-            while True:
-                # ---- one SGD step with real‑time simulation --------------                        
-                elapsed = self._simulate_compute(trace, curr_t, 1,
-                                            flops_step, round_noise, clock)
-                
-                curr_t  += elapsed
-                budget  -= elapsed
-    
-                try:
-                    batch = next(data_it)
-                except StopIteration:
-                    data_it = iter(client_data)
-                    batch = next(data_it)
-    
-                loss_val, loss_list = self._one_step(
-                    batch, conf, model, optim, crit, tokenizer)
-                self.loss_sq_sum  += sum(l**2 for l in loss_list)
-                self.seen_samples += len(loss_list)
+
+            if run_phase_2:
+                while True:
+                    # ---- one SGD step with real-time simulation --------------                        
+                    elapsed = self._simulate_compute(trace, curr_t, 1,
+                                                flops_step, round_noise, clock)
                     
-                steps_done        += 1
-                steps_done_bis        += 1
-                self.completed_steps = steps_done
-    
-                # loss EWMA for logging (same as above)
-                if steps_done <= len(client_data):
-                    if self.epoch_train_loss == 1e-4:
-                        self.epoch_train_loss = loss_val
-                    else:
-                        self.epoch_train_loss = \
-                            (1-conf.loss_decay)*self.epoch_train_loss   +\
-                            conf.loss_decay * loss_val
-    
-                # ---- delta   norms ---------------------------------------
-                delta       = [p.data - w0i for p, w0i in zip(model.parameters(), w0)]
-    
-                up_rate_now = bandwidth(trace, curr_t)
-                t_comm_full = (conf.model_size * clock / reduction) / max(up_rate_now, 1e-6)
-                keep_frac   = max(min_frac,
-                                min(1.0, budget / t_comm_full))
-                
-                comp_delta  = compress_topk(delta, keep_frac)    # Cₙ₊¹(Δₙ₊¹)
-                comp_norm   = self._l2_norm(comp_delta)          # = Uₙ₊¹
-                
-                gain_comm   = comp_norm - prev_comp_norm         # Uₙ₊¹ − Uₙ
+                    curr_t  += elapsed
+                    budget  -= elapsed
 
-                # With EWMA smoothing
-                ewma = λ * ewma + (1-λ) * gain_comm
-                gain_comm = ewma
+                    if not check_active(curr_t):
+                        t_comp_time = (curr_t - conf.start_time)
+                        return {
+                            "client_id": conf.client_id,
+                            "moving_loss": self.epoch_train_loss,
+                            "trained_size": steps_done * conf.batch_size,
+                            "success": False,
+                            "utility": 0.0,
+                            "update_weight": {},
+                            "wall_duration": float(conf.t_download + t_comp_time),
+                            "t_dl": float(conf.t_download),
+                            "t_comp": float(t_comp_time),
+                            "t_ul": 0.0,
+                        }
 
-                if gain_comm <= 0 or keep_frac <= min_frac or budget <= 0:
-                    break
+                    try:
+                        batch = next(data_it)
+                    except StopIteration:
+                        data_it = iter(client_data)
+                        batch = next(data_it)
 
-                prev_comp_norm = comp_norm
+                    loss_val, loss_list = self._one_step(
+                        batch, conf, model, optim, crit, tokenizer)
+                    self.loss_sq_sum  += sum(l**2 for l in loss_list)
+                    self.seen_samples += len(loss_list)
+                        
+                    steps_done        += 1
+                    steps_done_bis        += 1
+                    self.completed_steps = steps_done
+
+                    # loss EWMA for logging (same as above)
+                    if steps_done <= len(client_data):
+                        if self.epoch_train_loss == 1e-4:
+                            self.epoch_train_loss = loss_val
+                        else:
+                            self.epoch_train_loss = \
+                                (1-conf.loss_decay)*self.epoch_train_loss   +\
+                                conf.loss_decay * loss_val
+
+                    # ---- delta norms ---------------------------------------
+                    delta       = [p.data - w0i for p, w0i in zip(model.parameters(), w0)]
+
+                    up_rate_now = bandwidth(trace, curr_t)
+                    t_comm_full = (conf.model_size * clock / reduction) / max(up_rate_now, 1e-6)
+                    keep_frac   = max(min_frac,
+                                    min(1.0, budget / t_comm_full))
+                    
+                    comp_delta  = compress_topk(delta, keep_frac)    # Cₙ₊¹(Δₙ₊¹)
+                    comp_norm   = self._l2_norm(comp_delta)          # = Uₙ₊¹
+                    
+                    gain_comm   = comp_norm - prev_comp_norm         # Uₙ₊¹ − Uₙ
+
+                    # With EWMA smoothing
+                    ewma = λ * ewma + (1-λ) * gain_comm
+                    gain_comm = ewma
+
+                    if gain_comm <= 0 or keep_frac <= min_frac or budget <= 0:
+                        break
+
+                    prev_comp_norm = comp_norm
     
             # -------------------- upload simulation -----------------------
             upload_time = ClientUploadSimulator.simulate(
@@ -324,7 +424,7 @@ class AdaptiveTorchClient(TorchClient):
             k_iter  = iter(final_delta)                      # same order as model.parameters()
             for name, tensor in full_sd.items():
                 if tensor.requires_grad:                    # parameter → maybe compressed
-                    tensor.copy_(next(k_iter))              # already zero‑masked
+                    tensor.copy_(next(k_iter))              # already zero-masked
                 # else: buffer (running_mean, etc.) → leave unchanged
 
             update_dict = {
@@ -338,7 +438,6 @@ class AdaptiveTorchClient(TorchClient):
             # ----------- utility: same definition as vanilla --------------
             rms_loss    = math.sqrt(self.loss_sq_sum / max(1, self.seen_samples))
             utility_val = rms_loss * float(trained_unique)   # |Bᵢ|·RMS
-
 
             return {
                 "client_id"    : conf.client_id,
@@ -357,11 +456,8 @@ class AdaptiveTorchClient(TorchClient):
                 "dropout_frac": float(1.0 - final_keep),
             }
         except Exception:
-            # Full stack‑trace into the executor log
             logging.error("[adaptive_torch_client] EXCEPTION on client %s\n%s",
                           conf.client_id, traceback.format_exc())
-
-            # Minimal failure packet so the executor can still report back
             return {
                 "client_id"    : conf.client_id,
                 "moving_loss"  : 0.0,

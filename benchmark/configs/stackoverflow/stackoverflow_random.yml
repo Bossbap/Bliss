@@ -2,18 +2,17 @@
 
 # ========== Cluster configuration ========== 
 # ip address of the parameter server (need 1 GPU process)
-ps_ip: 129.104.252.43
+ps_ip: 129.104.253.50
 
 # ip address of each worker:# of available gpus process on each gpu in this node
 # Note that if we collocate ps and worker on same GPU, then we need to decrease this number of available processes on that GPU by 1
 # E.g., master node has 4 available processes, then 1 for the ps, and worker should be set to: worker:3
 worker_ips:
-    - 129.104.252.43:[3]
-    - 129.104.252.38:[4]
-    - 129.104.252.39:[4]
-    - 129.104.252.34:[4]
-    - 129.104.252.32:[4]
-
+    # - 129.104.253.50:[1]
+    - 129.104.253.45:[1]
+    # - 129.104.253.48:[1]
+    # - 129.104.253.36:[1]
+    
 exp_path: /users/eleves-a/2024/baptiste.geisenberger/FedScale/fedscale/cloud
 
 # Entry function of executor and aggregator under $exp_path
@@ -28,6 +27,10 @@ auth:
 # cmd to run before we can indeed run FAR (in order)
 setup_commands:
     - source /Data/baptiste.geisenberger/miniconda3/bin/activate fedscale
+    - export FEDSCALE_PREPROC_WORKERS=1
+    - export FEDSCALE_PREPROC_FILES_PER_TASK=500
+    - export PYTHONFAULTHANDLER=1
+
 
 # ========== Additional job configuration ========== 
 # Default parameters are specified in config_parser.py, wherein more description of the parameter can be found
@@ -37,8 +40,10 @@ job_conf:
     - job_name: stackoverflow                   # Generate logs under this folder: log_path/job_name/time_stamp
     - task: nlp
     - log_path: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark # Path of log files
-    - data_set: stackoverflow                     # Dataset: openImg, google_speech, stackoverflow
+    - data_set: blog                     # Dataset: openImg, google_speech, stackoverflow
     - data_dir: /Data/baptiste.geisenberger/Data/stackoverflow    # Path of the dataset
+    - data_map_file: /Data/baptiste.geisenberger/Data/client_data_mapping/results.csv
+    - block_size: 64
     - clients_file: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark/dataset/data/clients.pkl
     - use_cuda: True
     - num_loaders: 2
@@ -56,11 +61,4 @@ job_conf:
     - decay_factor: 0.95
     - decay_round: 10
     - batch_size: 32
-    - weight_decay: 1e-4
-
-    - sample_mode: bliss
-    - number_clients_to_refresh_utility: 300
-    - number_clients_to_predict_utility: 300
-    - amount_clients_predict_train_set: 1000
-    - amount_clients_refresh_train_set: 2000
-    - ema_alpha: 0.9
+    - weight_decay: 0.01

@@ -61,5 +61,5 @@ job_conf:
     - learning_rate: 0.02
     - decay_factor: 0.98
     - decay_round: 10
-    - weight_decay: 5e-4
+    - weight_decay: 4e-5
     - test_bsz: 20

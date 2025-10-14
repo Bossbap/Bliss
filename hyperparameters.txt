@@ -6,7 +6,8 @@ exploration_factor = 0.9 - Controls ε-greedy exploration of new clients
 exploration_decay = 0.98 default, 0.95 for Oort - Controls ε-greedy exploration of new clients
 exploration_min = 0.2; StackOverflow = 0.4 - Minimum exploration fraction
 sample_window = 20 default, 5.0 in Oort - multiplier that sets how wide Oort looks when it is exploring brand-new (so-far-untried) clients.
-round_threshold = 30 default, 10 in Oort - percentile of duration that sets target duration and penalises stragglers
+t_budget = 300 default (seconds) - preferred round duration; pacer relaxes/tightens this when statistical utility stagnates or surges.
+# round_threshold = 30 legacy percentile knob kept for compatibility; prefer tuning t_budget instead.
 blacklist_rounds = -1, 10 in paper max-times-a-client-may-be-picked before we temporarily stop calling it.
 clip_bound = 0.9 - sets the quantile used to cap (“clip”) very large rewards so outliers don’t skew the sampler.
 cut_off_util = 0.05 - Expands/ contracts the set of top-scoring clients from which the final exploit subset is randomly drawn. It controls how wide the “top clients” window is after scores are sorted. Smaller values (e.g. 0.8) widen the pool; values > 1 narrow it.

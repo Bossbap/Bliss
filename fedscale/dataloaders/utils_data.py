@@ -2,6 +2,15 @@
 
 import sys
 from torchvision import transforms
+try:
+    # Access job args to allow data-dependent switches (e.g., OpenImg resize)
+    from fedscale.cloud import config_parser as parser
+    _ARGS = parser.args
+except Exception:
+    # If imported outside FedScale runtime, fall back to sensible defaults
+    class _Dummy:
+        openimg_size = 96
+    _ARGS = _Dummy()
 
 def get_data_transform(data: str):
     if data == 'mnist':
@@ -83,22 +92,23 @@ def get_data_transform(data: str):
             # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
     elif data == 'openImg':
+        # Allow switching between 96x96 (Oort) and 256x256 (FedScale legacy)
+        try:
+            img_size = int(getattr(_ARGS, 'openimg_size', 96))
+        except Exception:
+            img_size = 96
+
         train_transform = transforms.Compose([
-            # transforms.RandomResizedCrop(224),
-            transforms.Resize((256, 256)),
+            transforms.Resize((img_size, img_size)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            #transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             transforms.Normalize((0.4914, 0.4822, 0.4465),
                                  (0.2023, 0.1994, 0.2010)),
         ])
 
         test_transform = transforms.Compose([
-            transforms.Resize((256, 256)),
-            # transforms.RandomResizedCrop((128,128)),
-            # transforms.CenterCrop(224),
+            transforms.Resize((img_size, img_size)),
             transforms.ToTensor(),
-            #transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
             transforms.Normalize((0.4914, 0.4822, 0.4465),
                                  (0.2023, 0.1994, 0.2010)),
         ])

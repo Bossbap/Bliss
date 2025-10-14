@@ -248,6 +248,8 @@ class ClientManager:
                 'gsize': kwargs.get('gsize', None),
                 't_comp': kwargs.get('t_comp', None),
                 't_total': kwargs.get('t_total', None),
+                # record how many local iterations actually ran on the client
+                'steps': kwargs.get('steps', None),
             }
             self.pyr_sampler.update_client_util(client_id, feedbacks=feedbacks)
 
@@ -327,6 +329,52 @@ class ClientManager:
 
     def isClientActive(self, client_id, cur_time):
         return self.client_metadata[client_id].is_active(cur_time)
+    
+    def isClientActiveThroughout(self, client_id: int, start_time: float, end_time: float) -> bool:
+        """Return True if the client stays active for the entire interval [start_time, end_time).
+
+        Uses the client's 48h cyclic active/inactive schedule and checks coverage across
+        any number of wrapped cycles.
+        """
+        if end_time <= start_time:
+            return True
+
+        meta = self.client_metadata[client_id]
+        T = 48 * 3600.0
+
+        # Build active intervals over [0, T)
+        act_intervals = self._active_intervals(meta.active, meta.inactive)
+        if not act_intervals:
+            return False
+
+        def covered_in_cycle(seg_s: float, seg_e: float) -> bool:
+            """Check if [seg_s, seg_e) within one cycle [0,T) is fully covered by union of act_intervals."""
+            pos = seg_s
+            for (a, b) in act_intervals:
+                if b <= pos:
+                    continue
+                if a > pos:
+                    # gap before next active interval
+                    return False
+                # a <= pos < b  → extend coverage
+                pos = min(seg_e, b)
+                if pos >= seg_e:
+                    return True
+            return pos >= seg_e
+
+        t = start_time
+        while t < end_time:
+            r = t % T
+            cycle_end = t - r + T
+            sub_end = min(end_time, cycle_end)
+            seg_len = sub_end - t
+            # segment normalized into [0,T)
+            seg_s = r
+            seg_e = r + seg_len
+            if not covered_in_cycle(seg_s, seg_e):
+                return False
+            t = sub_end
+        return True
     
 
     # ──────────────────────────────────────────────────────────────

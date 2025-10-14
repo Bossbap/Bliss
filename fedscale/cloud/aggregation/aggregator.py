@@ -368,7 +368,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         self.round_duration = max(r["wall_duration"] for r in kept) if kept else 0.0
         self.flatten_client_duration = np.array([r["wall_duration"] for r in kept])
         self.virtual_client_clock = {
-            r["client_id"]: r["wall_duration"] for r in self.pending_client_results
+            int(r["client_id"]): r["wall_duration"] for r in self.pending_client_results
         }
 
         self.model_in_update = 0
@@ -382,7 +382,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         self._client_round_utils = {}
         self._client_time_breakdown = {}
         for r in self.pending_client_results:
-            cid = r["client_id"]
+            cid = int(r["client_id"])
             self._client_round_utils[cid] = float(r.get("utility", 0.0))
             # executor returns detailed times & iterations for adaptive path
             self._client_time_breakdown[cid] = {
@@ -396,7 +396,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             }
 
         for r in kept:
-            cid = r["client_id"]
+            cid = int(r["client_id"])
 
             if self.args.gradient_policy in ["q-fedavg"]:
                 self.client_training_results.append(r)
@@ -418,7 +418,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         for r in stragglers:
             self.client_manager.register_feedback(
-                r["client_id"],
+                int(r["client_id"]),
                 avg_util,
                 time_stamp=self.round,
                 duration=r["wall_duration"],
@@ -532,12 +532,14 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             if self.client_manager.mode in ("oort", "pyramidfl"):
                 self.client_manager.registerDuration(client_to_run, duration=roundDuration)
 
-            if self.client_manager.isClientActive(
-                client_to_run, roundDuration + self.global_virtual_clock
+            if self.client_manager.isClientActiveThroughout(
+                client_to_run,
+                start_time=self.global_virtual_clock,
+                end_time=self.global_virtual_clock + roundDuration,
             ):
                 sampledClientsReal.append(client_to_run)
                 completionTimes.append(roundDuration)
-                completed_client_clock[client_to_run] = roundDuration
+                completed_client_clock[int(client_to_run)] = roundDuration
 
         num_clients_to_collect = min(num_clients_to_collect, len(completionTimes))
         workers_sorted_by_completion_time = sorted(
@@ -602,7 +604,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         self.stats_util_accumulator.append(results["utility"])
         self.loss_accumulator.append(results["moving_loss"])
-        cid = results["client_id"]
+        cid = int(results["client_id"])
 
         dur_for_feedback = self.virtual_client_clock[cid]
 
@@ -621,6 +623,13 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                 extra_kwargs["t_total"] = t_pair[1]
             if "gsize" in results:
                 extra_kwargs["gsize"] = results["gsize"]
+            # Also forward actual iterations completed so PyramidFL can
+            # estimate per-step compute time correctly for the next round
+            if "iters" in results:
+                try:
+                    extra_kwargs["steps"] = int(results["iters"])  # alias for clarity in selector
+                except Exception:
+                    pass
 
         self.client_manager.register_feedback(
             cid,
@@ -925,7 +934,18 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         if self._client_time_breakdown:
             round_summary["client_times"] = self._client_time_breakdown
         if self.client_manager.mode in ("oort", "pyramidfl") and self._pre_util_map:
-            after = {int(cid): float(self._client_round_utils.get(cid, 0.0)) for cid in self._pre_util_map.keys()}
+            try:
+                metrics = self.client_manager.getAllMetrics() or {}
+                after = {
+                    int(cid): float((metrics.get(cid, {}) or {}).get("reward", 0.0))
+                    for cid in self._pre_util_map.keys()
+                }
+            except Exception:
+                logging.exception("[logging] could not gather post-utility map; falling back to raw client utilities")
+                after = {
+                    int(cid): float(self._client_round_utils.get(cid, 0.0))
+                    for cid in self._pre_util_map.keys()
+                }
             round_summary["oort_pyr_util_before"] = self._pre_util_map
             round_summary["oort_pyr_util_after"]  = after
         if self.client_manager.mode == "bliss":
@@ -1173,6 +1193,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                 "budget_recheck_steps": self.args.budget_recheck_steps,
                 "ewma_lambda": self.args.ewma_lambda,
                 "min_payload_frac": self.args.min_payload_frac,
+                "run_phase_2": self.args.run_phase_2,
                 "start_time": self.global_virtual_clock + t_dl,
                 "model_size": self.model_size,
                 "model_amount_parameters": self.model_amount_parameters,

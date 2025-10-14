@@ -8,7 +8,6 @@ from overrides import overrides
 from torch.nn import CTCLoss
 
 from fedscale.cloud.execution.client_base import ClientBase
-from fedscale.cloud.execution.optimizers import ClientOptimizer
 from fedscale.cloud.internal.torch_model_adapter import TorchModelAdapter
 from fedscale.dataloaders.nlp import mask_tokens
 from fedscale.utils.model_test_module import test_pytorch_model
@@ -23,9 +22,7 @@ class TorchClient(ClientBase):
         :param args: Job args
         """
         self.args = args
-        self.optimizer = ClientOptimizer()
-        self.device = args.cuda_device if args.use_cuda else torch.device(
-            'cpu')
+        self.device = args.cuda_device if args.use_cuda else torch.device('cpu')
         if args.task == "detection":
             dev = args.cuda_device if args.use_cuda else torch.device("cpu")
             self.im_data   = Variable(torch.FloatTensor(1)).to(dev)
@@ -59,17 +56,17 @@ class TorchClient(ClientBase):
         # Override local steps if PyramidFL set it; else use provided local_steps
         local_steps = int(getattr(conf, "local_steps", self.args.local_steps))
 
-        trained_unique_samples = min(
-            len(client_data.dataset), local_steps * conf.batch_size)
+        trained_unique_samples = min(len(client_data.dataset), local_steps * conf.batch_size)
         self.global_model = None
 
         self.loss_sq_sum = 0.0
         self.seen_samples = 0
         self.completed_steps = 0
 
+        # --- FedProx (snapshot of global parameters w_t) ---
         if conf.gradient_policy == 'fed-prox':
-            # could be move to optimizer
-            self.global_model = [param.data.clone() for param in model.parameters()]
+            # keep exact tensor copies for proximal term; no grad, on same device
+            self.global_model = [param.detach().clone().to(self.device) for param in model.parameters()]
 
         optimizer = self.get_optimizer(model, conf)
         criterion = self.get_criterion(conf)
@@ -116,7 +113,7 @@ class TorchClient(ClientBase):
                     mask = torch.ones_like(abs_flat, dtype=torch.bool)
                 flat_delta = flat_delta * mask
 
-        # reconstruct masked local weights: global + masked_delta
+            # reconstruct masked local weights: global + masked_delta
             masked_params = {}
             cursor = 0
             for k in order:
@@ -173,19 +170,19 @@ class TorchClient(ClientBase):
             optimizer = torch.optim.Adam(
                 optimizer_grouped_parameters, lr=conf.learning_rate, weight_decay=1e-2)
         else:
+            # CV / speech tasks (SGD): respect YAML-configured weight_decay
+            wd = float(getattr(conf, "weight_decay", 0.0) or 0.0)
             optimizer = torch.optim.SGD(
-                model.parameters(), lr=conf.learning_rate, momentum=0.9, weight_decay=5e-4)
+                model.parameters(), lr=conf.learning_rate, momentum=0.9, weight_decay=wd)
         return optimizer
 
     def get_criterion(self, conf):
 
         criterion = None
         if conf.task == 'voice':
-            criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True)\
-                        .to(self.device)
+            criterion = torch.nn.CTCLoss(reduction='none', zero_infinity=True).to(self.device)
         else:
-            criterion = torch.nn.CrossEntropyLoss(
-                reduction='none').to(device=self.device)
+            criterion = torch.nn.CrossEntropyLoss(reduction='none').to(device=self.device)
         return criterion
 
     def train_step(self, client_data, conf, model, optimizer, criterion):
@@ -193,13 +190,11 @@ class TorchClient(ClientBase):
         for data_pair in client_data:
             if conf.task == 'nlp':
                 (data, _) = data_pair
-                data, target = mask_tokens(
-                    data, tokenizer, conf, device=self.device)
+                # NOTE: assumes `tokenizer` is in scope via enclosing train(); if not, pass it via conf
+                data, target = mask_tokens(data, tokenizer, conf, device=self.device)
             elif conf.task == 'voice':
-                (data, target, input_percentages,
-                 target_sizes), _ = data_pair
-                input_sizes = input_percentages.mul_(
-                    int(data.size(3))).int()
+                (data, target, input_percentages, target_sizes), _ = data_pair
+                input_sizes = input_percentages.mul_(int(data.size(3))).int()
             elif conf.task == 'detection':
                 temp_data = data_pair
                 target = temp_data[4]
@@ -216,9 +211,7 @@ class TorchClient(ClientBase):
                 data = torch.unsqueeze(data, 1).to(device=self.device)
             elif conf.task == 'text_clf' and conf.model == 'albert-base-v2':
                 (data, masks) = data
-                data, masks = Variable(data).to(
-                    device=self.device), Variable(masks).to(device=self.device)
-
+                data, masks = Variable(data).to(device=self.device), Variable(masks).to(device=self.device)
             else:
                 data = Variable(data).to(device=self.device)
 
@@ -230,37 +223,30 @@ class TorchClient(ClientBase):
             elif conf.task == 'voice':
                 outputs, output_sizes = model(data, input_sizes)
                 outputs = outputs.transpose(0, 1).float()  # TxNxH
-                loss = criterion(
-                    outputs, target, output_sizes, target_sizes)
+                loss = criterion(outputs, target, output_sizes, target_sizes)
             elif conf.task == 'text_clf' and conf.model == 'albert-base-v2':
-                outputs = model(
-                    data, attention_mask=masks, labels=target)
+                outputs = model(data, attention_mask=masks, labels=target)
                 loss = outputs.loss
                 output = outputs.logits
             elif conf.task == "detection":
                 rois, cls_prob, bbox_pred, \
                 rpn_loss_cls, rpn_loss_box, \
                 RCNN_loss_cls, RCNN_loss_bbox, \
-                rois_label = model(
-                    self.im_data, self.im_info, self.gt_boxes, self.num_boxes)
+                rois_label = model(self.im_data, self.im_info, self.gt_boxes, self.num_boxes)
 
-                loss = rpn_loss_cls + rpn_loss_box \
-                       + RCNN_loss_cls + RCNN_loss_bbox
+                loss = rpn_loss_cls + rpn_loss_box + RCNN_loss_cls + RCNN_loss_bbox
 
                 loss_rpn_cls = rpn_loss_cls.item()
                 loss_rpn_box = rpn_loss_box.item()
                 loss_rcnn_cls = RCNN_loss_cls.item()
                 loss_rcnn_box = RCNN_loss_bbox.item()
-
             else:
                 output = model(data)
                 loss = criterion(output, target)
 
             # ======== collect training feedback for other decision components [e.g., oort selector] ======
-
             if conf.task == 'nlp' or (conf.task == 'text_clf' and conf.model == 'albert-base-v2'):
-                loss_list = [loss.item()]  # [loss.mean().data.item()]
-
+                loss_list = [loss.item()]
             elif conf.task == "detection":
                 loss_list = [loss.tolist()]
                 loss = loss.mean()
@@ -276,20 +262,24 @@ class TorchClient(ClientBase):
                 if self.epoch_train_loss == 1e-4:
                     self.epoch_train_loss = temp_loss
                 else:
-                    self.epoch_train_loss = (
-                                                    1. - conf.loss_decay) * self.epoch_train_loss + conf.loss_decay * temp_loss
+                    self.epoch_train_loss = (1. - conf.loss_decay) * self.epoch_train_loss + conf.loss_decay * temp_loss
 
-            # ========= Define the backward loss ==============
+            # ========= Backward (with FedProx if enabled) ==============
             optimizer.zero_grad()
             loss.backward()
+
+            # --- FedProx: add μ (w - w_t) to gradients before step ---
+            if conf.gradient_policy == 'fed-prox' and self.global_model is not None:
+                mu = float(getattr(conf, "proxy_mu", 0.0) or 0.0)
+                if mu != 0.0:
+                    with torch.no_grad():
+                        for p, p0 in zip(model.parameters(), self.global_model):
+                            if p.grad is not None:
+                                p.grad.add_(mu * (p.data - p0))
+
             optimizer.step()
 
-            # ========= Weight handler ========================
-            self.optimizer.update_client_weight(
-                conf, model, self.global_model if self.global_model is not None else None)
-
             self.completed_steps += 1
-
             if self.completed_steps == conf.local_steps:
                 break
 
@@ -307,16 +297,12 @@ class TorchClient(ClientBase):
             criterion = CTCLoss(reduction='mean').to(device=self.device)
         else:
             criterion = torch.nn.CrossEntropyLoss().to(device=self.device)
-        test_loss, acc, acc_5, test_results = test_pytorch_model(conf.rank, model, client_data,
-                                                                 device=self.device, criterion=criterion,
-                                                                 tokenizer=conf.tokenizer)
+        test_loss, acc, acc_5, test_results = test_pytorch_model(
+            conf.rank, model, client_data, device=self.device, criterion=criterion, tokenizer=conf.tokenizer
+        )
         return test_results
 
     @overrides
     def get_model_adapter(self, model) -> TorchModelAdapter:
-        """
-        Return framework-specific model adapter.
-        :param model: the model
-        :return: a model adapter containing the model
-        """
+        """Return framework-specific model adapter."""
         return TorchModelAdapter(model)

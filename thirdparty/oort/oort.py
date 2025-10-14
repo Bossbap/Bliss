@@ -27,9 +27,17 @@ class _training_selector(object):
         self.rng.seed(sample_seed)
         self.unexplored = set()
         self.args = args
-        self.round_threshold = args.round_threshold
-        self.round_prefer_duration = float('inf')
-        self.last_util_record = 0
+        # Legacy percentile-based pacer params (kept for reference)
+        # self.round_threshold = args.round_threshold
+        # self.round_prefer_duration = float('inf')
+        # self.last_util_record = 0
+        # self._last_round_threshold = self.round_threshold
+
+        # New T-budget pacer parameters (aligned with Bliss / Oort paper)
+        self.t_budget = float(getattr(args, "t_budget", 0.0))
+        self.pacer_step = int(getattr(args, "pacer_step", 20))
+        self.pacer_delta = float(getattr(args, "pacer_delta", 0.0))
+        self.round_prefer_duration = self.t_budget
 
         self.sample_window = self.args.sample_window
         self.exploitUtilHistory = []
@@ -38,8 +46,6 @@ class _training_selector(object):
         self.exploreClients = []
         self.successfulClients = set()
         self.blacklist = None
-
-        self._last_round_threshold = self.round_threshold
         self._last_round_prefer_duration = None
 
         np2.random.seed(sample_seed)
@@ -85,28 +91,55 @@ class _training_selector(object):
         self.exploitUtilHistory.append(lastExploitationUtil)
         self.successfulClients = set()
 
-        if self.training_round >= 2 * self.args.pacer_step and self.training_round % self.args.pacer_step == 0:
-            utilLast = sum(self.exploitUtilHistory[-2*self.args.pacer_step:-self.args.pacer_step])
-            utilCurr = sum(self.exploitUtilHistory[-self.args.pacer_step:])
-            baseline = max(utilLast, 1e-12)
-            rel_change = abs(utilCurr - utilLast) / baseline
+        # Legacy percentile-based pacer (kept for traceability):
+        # if self.training_round >= 2 * self.args.pacer_step and self.training_round % self.args.pacer_step == 0:
+        #     utilLast = sum(self.exploitUtilHistory[-2*self.args.pacer_step:-self.args.pacer_step])
+        #     utilCurr = sum(self.exploitUtilHistory[-self.args.pacer_step:])
+        #     baseline = max(utilLast, 1e-12)
+        #     rel_change = abs(utilCurr - utilLast) / baseline
+        #
+        #     if rel_change <= 0.1:
+        #         old = self.round_threshold
+        #         self.round_threshold = min(100., self.round_threshold + self.args.pacer_delta)
+        #         self.last_util_record = self.training_round - self.args.pacer_step
+        #         logging.info(
+        #             "[Oort.Pacer] Plateau at %d: last=%g, curr=%g, Δ/last=%0.2f%% → relax %0.1f%%→%0.1f%%",
+        #             self.training_round, utilLast, utilCurr, 100*rel_change, old, self.round_threshold
+        #         )
+        #     elif rel_change >= 5.0:
+        #         old = self.round_threshold
+        #         self.round_threshold = max(self.args.pacer_delta, self.round_threshold - self.args.pacer_delta)
+        #         self.last_util_record = self.training_round - self.args.pacer_step
+        #         logging.info(
+        #             "[Oort.Pacer] Surge at %d: last=%g, curr=%g, Δ/last=%0.2f%% → tighten %0.1f%%→%0.1f%%",
+        #             self.training_round, utilLast, utilCurr, 100*rel_change, old, self.round_threshold
+        #         )
+
+        if (self.training_round >= 2 * self.pacer_step and
+                self.training_round % self.pacer_step == 0):
+            util_last = sum(self.exploitUtilHistory[-2 * self.pacer_step:-self.pacer_step])
+            util_curr = sum(self.exploitUtilHistory[-self.pacer_step:])
+            baseline = max(util_last, 1e-12)
+            rel_change = abs(util_curr - util_last) / baseline
 
             if rel_change <= 0.1:
-                old = self.round_threshold
-                self.round_threshold = min(100., self.round_threshold + self.args.pacer_delta)
-                self.last_util_record = self.training_round - self.args.pacer_step
+                old = self.t_budget
+                self.t_budget += self.pacer_delta
                 logging.info(
-                    "[Oort.Pacer] Plateau at %d: last=%g, curr=%g, Δ/last=%0.2f%% → relax %0.1f%%→%0.1f%%",
-                    self.training_round, utilLast, utilCurr, 100*rel_change, old, self.round_threshold
+                    "[Oort.Pacer] Plateau at %d: last=%g, curr=%g, Δ/last=%0.2f%% → relax T %.3fs→%.3fs",
+                    self.training_round, util_last, util_curr, 100 * rel_change, old, self.t_budget
                 )
             elif rel_change >= 5.0:
-                old = self.round_threshold
-                self.round_threshold = max(self.args.pacer_delta, self.round_threshold - self.args.pacer_delta)
-                self.last_util_record = self.training_round - self.args.pacer_step
+                old = self.t_budget
+                self.t_budget = max(self.pacer_delta, self.t_budget - self.pacer_delta)
                 logging.info(
-                    "[Oort.Pacer] Surge at %d: last=%g, curr=%g, Δ/last=%0.2f%% → tighten %0.1f%%→%0.1f%%",
-                    self.training_round, utilLast, utilCurr, 100*rel_change, old, self.round_threshold
+                    "[Oort.Pacer] Surge at %d: last=%g, curr=%g, Δ/last=%0.2f%% → tighten T %.3fs→%.3fs",
+                    self.training_round, util_last, util_curr, 100 * rel_change, old, self.t_budget
                 )
+
+            # Expose the new preferred duration to downstream consumers.
+            self.args.t_budget = self.t_budget
+            self.round_prefer_duration = self.t_budget
 
     # ---------- top-K with explicit explore/exploit split ----------
     def select_participant(self, num_of_clients, feasible_clients=None):
@@ -143,24 +176,16 @@ class _training_selector(object):
         unexplored_keys = [k for k in orderedKeys if self.totalArms[k]['count'] == 0]
         explored_keys   = [k for k in orderedKeys if self.totalArms[k]['count'] >  0]
 
-        # Preferred duration percentile for pacer penalty
-        if self.round_threshold < 100.:
-            # We compute over known durations (including zeros). If you prefer to
-            # ignore zeros, filter them here.
-            sortedDuration = sorted([self.totalArms[k]['duration'] for k in client_list])
-            idx = min(int(len(sortedDuration) * self.round_threshold/100.), len(sortedDuration)-1)
-            self.round_prefer_duration = sortedDuration[idx] if sortedDuration else float('inf')
-        else:
-            self.round_prefer_duration = float('inf')
+        # Preferred duration sourced from pacer T-budget
+        self.round_prefer_duration = float(self.t_budget) if self.t_budget > 0 else float('inf')
 
         # Log pacer line (visible in your plots)
         prev_pd = self._last_round_prefer_duration
         if (prev_pd is None) or (abs(self.round_prefer_duration - prev_pd) > 1e-9):
             logging.info(
-                "[Oort.Pacer] round=%d: preferred_duration=%s (threshold=%0.1f%%)%s",
+                "[Oort.Pacer] round=%d: preferred_duration=%s (t_budget)%s",
                 self.training_round,
                 ("inf" if self.round_prefer_duration == float('inf') else f"{self.round_prefer_duration:.3f}s"),
-                self.round_threshold,
                 ("" if prev_pd is None else f", was {prev_pd:.3f}s" if prev_pd != float('inf') else ", was inf")
             )
             self._last_round_prefer_duration = self.round_prefer_duration
@@ -276,9 +301,9 @@ class _training_selector(object):
         return {
             "algo": "oort",
             "training_round": int(self.training_round),
-            "round_threshold": float(self.round_threshold),
-            "pacer_step": int(self.args.pacer_step),
-            "pacer_delta": float(self.args.pacer_delta),
+            "t_budget": (None if self.t_budget in (None, float('inf')) else float(self.t_budget)),
+            "pacer_step": int(self.pacer_step),
+            "pacer_delta": float(self.pacer_delta),
             "preferred_duration": (None if self.round_prefer_duration == float('inf') else float(self.round_prefer_duration))
         }
     
@@ -306,6 +331,8 @@ class _pyramid_training_selector(_training_selector):
             'gsize': float(feedbacks.get('gsize', 0.0) or 0.0),
             't_comp': feedbacks.get('t_comp', None),
             't_total': feedbacks.get('t_total', None),
+            # last observed iterations (fall back to base local_steps)
+            'steps': int(getattr(self.args, 'local_steps', 1)),
         })
 
     def update_client_util(self, client_id, feedbacks):
@@ -317,6 +344,12 @@ class _pyramid_training_selector(_training_selector):
             arm['t_comp'] = float(feedbacks['t_comp'])
         if 't_total' in feedbacks and feedbacks['t_total'] is not None:
             arm['t_total'] = float(feedbacks['t_total'])
+        # track actual iterations run last time if reported
+        if 'steps' in feedbacks and feedbacks['steps'] is not None:
+            try:
+                arm['steps'] = int(feedbacks['steps'])
+            except Exception:
+                pass
 
     # ---------- selection + overrides ----------
     def select_participant(self, num_of_clients, feasible_clients=None):
@@ -366,19 +399,26 @@ class _pyramid_training_selector(_training_selector):
             arm = self.totalArms[cid]
             t_comp_prev = arm.get('t_comp', None)
             t_total_prev = arm.get('t_total', None)
+            steps_prev = int(arm.get('steps', I_fix) or I_fix)
 
             # If missing stats, fall back to no dropout / base steps
             if t_comp_prev is None or t_total_prev is None or t_comp_prev <= 0.0:
                 self._overrides[cid] = {"dropout_p": 0.0, "local_steps": I_fix}
                 continue
 
+            # Split comm/compute and estimate per-step compute time
             t_comm_prev = max(0.0, t_total_prev - t_comp_prev)
             t_prime = t_comp_prev + (1.0 - P_i) * t_comm_prev
+            # Estimate the time it takes to run I_fix steps on this client
+            # using the last-round observed per-step time (t_comp_prev / steps_prev).
+            # This mirrors the intended formula that scales relative to I_fix.
+            per_step = max(t_comp_prev / max(1, steps_prev), 1e-8)
+            t_comp_equiv_fix = per_step * float(I_fix)
 
             if not (T < float('inf')):  # no pacer yet -> base steps
                 I_i = I_fix
             else:
-                extra = beta * max(T - t_prime, 0.0) / max(t_comp_prev / float(I_fix), 1e-8)
+                extra = beta * max(T - t_prime, 0.0) / max(t_comp_equiv_fix, 1e-8)
                 I_i = int(max(I_fix, round((1.0 + extra) * I_fix)))
 
             self._overrides[cid] = {"dropout_p": float(P_i), "local_steps": int(I_i)}
@@ -392,3 +432,90 @@ class _pyramid_training_selector(_training_selector):
 
     def get_overrides(self):
         return self._overrides
+
+
+def create_testing_selector(data_distribution=None, client_info=None, model_size=None):
+    return _testing_selector(data_distribution, client_info, model_size)
+
+class _testing_selector:
+    """Oort's testing selector
+    We provide two kinds of selector:
+    select_by_deviation: testing participant selection that preserves data representativeness.
+    select_by_category: testing participant selection that enforce developer's requirement on
+        distribution of the testing set. Note that this selector is avaliable only if the client
+        info is provided.
+    Attributes:
+        client_info: Optional; A dictionary that stores client id to client profile(system speech and
+            network bandwidth) mapping. For example, {1: [153.0, 2209.61]} indicates that client 1
+            needs 153ms to run a single sample inference and their network bandwidth is 2209 Kbps.
+        model_size: Optional; the size of the model(i.e., the data transfer size) in kb
+        data_distribution: Optional; individual data characteristics(distribution).
+    """
+    def __init__(self, data_distribution=None, client_info=None, model_size=None):
+        """Inits testing selector."""
+        self.client_info = client_info
+        self.model_size = model_size
+        self.data_distribution = data_distribution
+        if self.client_info:
+            self.client_idx_list = list(range(len(client_info)))
+    def update_client_info(self, client_ids, client_profile):
+        """Update clients' profile(system speed and network bandwidth)
+        Since the clients' info is dynamic, developers can use this function
+        to update clients' profile. If the client id does not exist, Oort will
+        create a new entry for this client.
+        Args:
+            client_ids: A list of client ids whose profile needs to be updated
+            client_info: Updated information about client profile, formatted as
+                a list of pairs(speed, bw)
+        Raises:
+            Raises an error if len(client_ids) != len(client_info)
+        """
+        return 0
+    def _hoeffding_bound(self, dev_tolerance, capacity_range, total_num_clients, confidence=0.8):
+        """Use hoeffding bound to cap the deviation from E[X]
+        Args:
+            dev_tolerance: maximum deviation from the empirical (E[X])
+            capacity_range: the global max-min range of number of samples across all clients
+            total_num_clients: total number of feasible clients
+            confidence: Optional; Pr[|X - E[X]| < dev_tolerance] > confidence
+        Returns:
+            The estimated number of participant needed to satisfy developer's requirement
+        """
+        factor = (1.0 - 2*total_num_clients/math.log(1-math.pow(confidence, 1)) \
+                                    * (dev_tolerance/float(capacity_range)) ** 2)
+        n = (total_num_clients+1.0)/factor
+        return n
+    def select_by_deviation(self, dev_target, range_of_capacity, total_num_clients,
+            confidence=0.8, overcommit=1.1):
+        """Testing selector that preserves data representativeness.
+        Given the developer-specified tolerance `dev_target`, Oort can estimate the number
+        of participants needed such that the deviation from the representative categorical
+        distribution is bounded.
+        Args:
+            dev_target: developer-specified tolerance
+            range_of_capacity: the global max-min range of number of samples across all clients
+            confidence: Optional; Pr[|X - E[X]| < dev_tolerance] > confidence
+            overcommit: Optional; to handle stragglers
+        Returns:
+            A list of selected participants
+        """
+        num_of_selected = self._hoeffding_bound(dev_target, range_of_capacity, total_num_clients, confidence=0.8)
+        return num_of_selected
+    def select_by_category(self, request_list, max_num_clients=None, greedy_heuristic=True):
+        """Testing selection based on requested number of samples per category.
+        When individual data characteristics(distribution) is provided, Oort can
+        enforce client's request on the number of samples per category.
+        Args:
+            request_list: a list that specifies the desired number of samples per category.
+                i.e., [num_requested_samples_class_x for class_x in request_list].
+            max_num_clients: Optional; the maximum number of participants .
+            greedy_heuristic: Optional; whether to use Oort-based solver. Otherwise, Mix-Integer Linear Programming
+        Returns:
+            A list of selected participants ids.
+        Raises:
+            Raises an error if 1) no client information is provided or 2) the requirement
+            cannot be satisfied(e.g., max_num_clients too small).
+        """
+        client_sample_matrix, test_duration, lp_duration = run_select_by_category(request_list, self.data_distribution,
+            self.client_info, max_num_clients, self.model_size, greedy_heuristic)
+        return client_sample_matrix, test_duration, lp_duration

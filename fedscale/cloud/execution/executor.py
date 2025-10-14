@@ -153,9 +153,21 @@ class Executor(object):
     def run(self):
         """Start running the executor by setting up execution and communication environment, and monitoring the grpc message."""
         self.setup_env()
-        self.training_sets, self.testing_sets = self.init_data()
-        self.setup_communication()
-        self.event_monitor()
+        try:
+            self.training_sets, self.testing_sets = self.init_data()
+        except Exception:
+            logging.exception("[executor %s] Fatal error during init_data (dataset build/preproc)", self.executor_id)
+            raise
+        try:
+            self.setup_communication()
+        except Exception:
+            logging.exception("[executor %s] Fatal error setting up communication", self.executor_id)
+            raise
+        try:
+            self.event_monitor()
+        except Exception:
+            logging.exception("[executor %s] Unhandled exception in event monitor", self.executor_id)
+            raise
 
     def dispatch_worker_events(self, request):
         """Add new events to worker queues
@@ -491,5 +503,11 @@ class Executor(object):
 
 
 if __name__ == "__main__":
-    executor = Executor(parser.args)
-    executor.run()
+    try:
+        executor = Executor(parser.args)
+        executor.run()
+    except Exception:
+        # Ensure a clear traceback is emitted in executor logs and process exits non-zero
+        logging.exception("[executor %s] Uncaught top-level exception", getattr(parser.args, 'this_rank', 'unknown'))
+        import sys
+        sys.exit(1)

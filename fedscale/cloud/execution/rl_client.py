@@ -2,7 +2,6 @@ import logging
 import math
 
 from fedscale.cloud.execution.torch_client import TorchClient
-from fedscale.cloud.execution.optimizers import ClientOptimizer
 
 import fedscale.cloud.config_parser as parser
 if parser.args.task == 'rl':
@@ -13,7 +12,6 @@ class RLClient(TorchClient):
     """Basic client component in Federated Learning"""
 
     def __init__(self, conf):
-        self.optimizer = ClientOptimizer()
         self.dqn = DQN(conf)
         pass
 

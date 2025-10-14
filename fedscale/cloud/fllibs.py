@@ -23,9 +23,15 @@ def import_libs():
     if parser.args.task == 'nlp' or parser.args.task == 'text_clf':
         global AdamW, AlbertTokenizer, AutoConfig, AutoModelWithLMHead, AutoTokenizer, MobileBertForPreTraining, load_and_cache_examples, mask_tokens
 
-        from transformers import (AdamW, AlbertTokenizer, AutoConfig,
-                                  AutoModelWithLMHead, AutoTokenizer,
-                                  MobileBertForPreTraining)
+        try:
+            from transformers import (AdamW, AlbertTokenizer, AutoConfig,
+                                    AutoModelWithLMHead, AutoTokenizer,
+                                    MobileBertForPreTraining)
+        except ImportError:
+            from torch.optim import AdamW
+            from transformers import (AlbertTokenizer, AutoConfig,
+                                    AutoModelWithLMHead, AutoTokenizer,
+                                    MobileBertForPreTraining)
 
         from fedscale.dataloaders.nlp import load_and_cache_examples, mask_tokens
         tokenizer = AlbertTokenizer.from_pretrained(
