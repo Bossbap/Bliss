@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import collections
 import copy
+import json
 import os
 import pickle
 import random
@@ -42,17 +43,65 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         # init aggregator logger
         logger.initiate_aggregator_setting()
 
+        resume_dir = getattr(args, "resume_from", "") or ""
+        self._resume_state = None
+        self._resume_plan = None
+        self._resume_model_weights = None
+        self._resume_optimizer_state = None
+        self._resume_random_state = None
+        self._resume_numpy_state = None
+        self._resume_torch_state = None
+        self._resume_cuda_states = None
+        self._resume_client_manager_state = None
+        self._resume_aggregator_state = None
+
+        if resume_dir:
+            resume_dir = os.path.abspath(resume_dir)
+            self._resume_state = self._load_checkpoint(resume_dir)
+            saved_args = copy.deepcopy(self._resume_state.get("args", {}))
+            args = self._merge_args(args, saved_args)
+            self._resume_plan = copy.deepcopy(self._resume_state.get("plan"))
+            self._resume_model_weights = self._resume_state.get("model_weights")
+            self._resume_optimizer_state = self._resume_state.get("optimizer_state")
+            rng_pack = self._resume_state.get("rng", {})
+            self._resume_random_state = rng_pack.get("python")
+            self._resume_numpy_state = rng_pack.get("numpy")
+            self._resume_torch_state = rng_pack.get("torch")
+            self._resume_cuda_states = rng_pack.get("torch_cuda")
+            self._resume_client_manager_state = self._resume_state.get("client_manager")
+            self._resume_aggregator_state = self._resume_state.get("aggregator", {})
+            self._checkpoint_dir = resume_dir
+        else:
+            self._checkpoint_dir = None
+
         logging.info(f"Job args {args}")
         self.args = args
-        self.experiment_mode = args.experiment_mode
-        self.device = args.cuda_device if args.use_cuda else torch.device("cpu")
+        self.base_seed = getattr(self.args, "sample_seed", None)
+        self.setup_seed(seed=self.base_seed)
+        self.experiment_mode = self.args.experiment_mode
+        self.device = self.args.cuda_device if self.args.use_cuda else torch.device("cpu")
 
         # ======== env information ========
         self.this_rank = 0
         self.global_virtual_clock = 0.0
         self.round_duration = 0.0
         self.resource_manager = ResourceManager(self.experiment_mode)
-        self.client_manager = self.init_client_manager(args=args)
+        self.client_manager = self.init_client_manager(args=self.args)
+
+        if self._resume_client_manager_state:
+            self.client_manager.load_state(self._resume_client_manager_state)
+
+        if not self._checkpoint_dir:
+            base_log_path = os.path.abspath(self.args.log_path)
+            self._checkpoint_dir = os.path.join(
+                base_log_path,
+                "logs",
+                self.args.job_name,
+                self.args.time_stamp,
+                "checkpoints",
+            )
+        self._checkpoint_file = os.path.join(self._checkpoint_dir, "latest.pt")
+        self.checkpoint_interval = int(getattr(self.args, "checkpoint_interval", -1))
 
         # ======== model and data ========
         self.model_in_update = 0
@@ -63,6 +112,8 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         self.connection_timeout = self.args.connection_timeout
         self.executors = None
         self.grpc_server = None
+        # Map executor_id to peer IP observed at registration
+        self.executor_peers = {}
 
         # ======== Event Queues =======
         self.individual_client_events = {}  # Unicast
@@ -75,6 +126,9 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         self.sampled_participants = []
         self.sampled_executors = []
+        # ensure attribute exists for non-adaptive summary logging paths
+        self.virtual_client_clock = {}
+        self.flatten_client_duration = np.array([])
 
         self.round_stragglers = []
         self.model_size = 0
@@ -95,6 +149,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         # PyramidFL per-client (t_comp, t_total) cache for the current round
         self._pyramid_times = {}
+        self._round_update_cache = {}
 
         # number of registered executors
         self.registered_executor_info = set()
@@ -140,6 +195,9 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             self.wandb = None
 
         self.param_order = None
+
+        # Apply resume-specific core state (round counters, learning rate, clocks)
+        self._apply_resume_core_state()
 
         # ======== Task specific ============
         self.init_task_context()
@@ -211,26 +269,262 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         except Exception:
             logging.exception("[logging] failed to json-dump payload for tag=%s", tag)
 
+    # ------------------------------------------------------------------
+    #  Checkpoint helpers
+    # ------------------------------------------------------------------
+    def _merge_args(self, live_args, saved_args):
+        """Merge runtime args with checkpoint args, keeping runtime-specific overrides."""
+        live_dict = copy.deepcopy(vars(live_args))
+        runtime_overrides = {
+            "ps_ip",
+            "ps_port",
+            "executor_configs",
+            "this_rank",
+            "num_executors",
+            "cuda_device",
+            "job_name",
+            "time_stamp",
+            "resume_from",
+            "checkpoint_interval",
+        }
+        for key, value in (saved_args or {}).items():
+            if key in runtime_overrides:
+                continue
+            live_dict[key] = value
+        return types.SimpleNamespace(**live_dict)
+
+    def _load_checkpoint(self, directory: str):
+        """Load and return the raw checkpoint payload from *directory*."""
+        ckpt_file = os.path.join(directory, "latest.pt")
+        if not os.path.isfile(ckpt_file):
+            raise FileNotFoundError(
+                f"Checkpoint not found at {ckpt_file}. Ensure --resume_from points to a valid directory."
+            )
+        logging.info("Loading checkpoint from %s", ckpt_file)
+        payload = torch.load(ckpt_file, map_location="cpu")
+        version = payload.get("version", 0)
+        if version != 1:
+            raise ValueError(f"Unsupported checkpoint version {version} (expected 1)")
+        return payload
+
+    def _apply_resume_core_state(self):
+        """Restore core counters, clocks and LR when resuming."""
+        if not self._resume_state:
+            return
+
+        agg = self._resume_aggregator_state or {}
+        try:
+            self.round = int(agg.get("round", self.round))
+        except Exception:
+            pass
+        try:
+            self.global_virtual_clock = float(agg.get("global_virtual_clock", self.global_virtual_clock))
+        except Exception:
+            pass
+        try:
+            self.round_duration = float(agg.get("round_duration", self.round_duration))
+        except Exception:
+            pass
+        try:
+            self.tasks_round = int(agg.get("tasks_round", self.tasks_round))
+        except Exception:
+            pass
+
+        lr = agg.get("learning_rate", None)
+        if lr is not None:
+            try:
+                self.args.learning_rate = float(lr)
+            except Exception:
+                logging.warning("Failed to cast checkpoint learning rate %s", lr)
+
+        logging.info(
+            "Resuming from checkpoint: round=%d, clock=%s, lr=%s",
+            self.round,
+            self.global_virtual_clock,
+            self.args.learning_rate,
+        )
+        self._resume_state = None
+
+    def _collect_current_plan(self, clients_to_run, round_stragglers):
+        """Capture the current round plan (after selection) for checkpointing."""
+        plan = {
+            "round": int(self.round),
+            "mode": self.client_manager.mode,
+            "adaptive_training": bool(self.args.adaptive_training),
+            "sampled_participants": list(self.sampled_participants),
+            "clients_to_run": list(clients_to_run),
+            "round_stragglers": list(round_stragglers),
+            "tasks_round": int(self.tasks_round),
+            "virtual_client_clock": {int(k): float(v) for k, v in (self.virtual_client_clock or {}).items()},
+            "round_duration": float(self.round_duration),
+            "flatten_client_duration": self.flatten_client_duration.tolist() if isinstance(self.flatten_client_duration, np.ndarray) else list(self.flatten_client_duration or []),
+            "client_time_breakdown": {int(k): copy.deepcopy(v) for k, v in (self._client_time_breakdown or {}).items()},
+            "pre_util_map": {int(k): float(v) for k, v in (self._pre_util_map or {}).items()},
+            "pyramid_times": {int(k): tuple(v) for k, v in (self._pyramid_times or {}).items()},
+            "bliss_pred_seen": {int(k): float(v) for k, v in (self._bliss_pred_seen or {}).items()},
+            "bliss_pred_unseen": {int(k): float(v) for k, v in (self._bliss_pred_unseen or {}).items()},
+            "round_begin_payload": copy.deepcopy(self._round_begin_payload),
+        }
+        return plan
+
+    def _apply_round_plan(self, plan: dict):
+        """Apply a stored round plan (used when resuming)."""
+        if not plan:
+            raise ValueError("Empty round plan supplied for resume.")
+
+        self.sampled_participants = list(plan.get("sampled_participants", []))
+        self.tasks_round = int(plan.get("tasks_round", self.args.num_participants))
+        self.round_duration = float(plan.get("round_duration", 0.0))
+        self.round_stragglers = list(plan.get("round_stragglers", []))
+        vc = plan.get("virtual_client_clock", {}) or {}
+        self.virtual_client_clock = {int(k): float(v) for k, v in vc.items()}
+        flatten = plan.get("flatten_client_duration", [])
+        self.flatten_client_duration = np.array(flatten, dtype=float) if flatten else np.array([])
+        ctb = plan.get("client_time_breakdown", {}) or {}
+        self._client_time_breakdown = {int(k): copy.deepcopy(v) for k, v in ctb.items()}
+        self._pre_util_map = {int(k): float(v) for k, v in (plan.get("pre_util_map", {}) or {}).items()}
+        self._pyramid_times = {int(k): tuple(v) for k, v in (plan.get("pyramid_times", {}) or {}).items()}
+        self._bliss_pred_seen = {int(k): float(v) for k, v in (plan.get("bliss_pred_seen", {}) or {}).items()}
+        self._bliss_pred_unseen = {int(k): float(v) for k, v in (plan.get("bliss_pred_unseen", {}) or {}).items()}
+        self._round_begin_payload = copy.deepcopy(plan.get("round_begin_payload", {}))
+
+        # Reset per-round buffers
+        self.completed_clients = []
+        self.failed_clients = []
+        self._client_round_utils = {}
+        self.pending_client_results = []
+
+        # Emit round-begin log to maintain continuity.
+        if self._round_begin_payload:
+            self._log_json("ROUND_BEGIN", self._round_begin_payload)
+
+        clients_to_run = list(plan.get("clients_to_run", []))
+        self.resource_manager.register_tasks(clients_to_run)
+        return clients_to_run
+
+    def _checkpoint_payload(self, plan: dict) -> dict:
+        """Build the payload that will be persisted to disk."""
+        args_snapshot = copy.deepcopy(vars(self.args))
+        model_weights = []
+        for w in self.model_wrapper.get_weights():
+            if isinstance(w, torch.Tensor):
+                model_weights.append(w.detach().cpu().numpy())
+            else:
+                model_weights.append(np.asarray(w, dtype=np.float32))
+
+        rng_pack = {
+            "python": random.getstate(),
+            "numpy": np.random.get_state(),
+            "torch": torch.random.get_rng_state(),
+            "torch_cuda": None,
+        }
+        if torch.cuda.is_available():
+            try:
+                rng_pack["torch_cuda"] = torch.cuda.get_rng_state_all()
+            except Exception:
+                logging.warning("Failed to capture CUDA RNG state for checkpoint.")
+
+        payload = {
+            "version": 1,
+            "saved_at": time.time(),
+            "args": args_snapshot,
+            "rng": rng_pack,
+            "aggregator": {
+                "round": int(self.round),
+                "global_virtual_clock": float(self.global_virtual_clock),
+                "round_duration": float(self.round_duration),
+                "tasks_round": int(self.tasks_round),
+                "learning_rate": float(self.args.learning_rate),
+            },
+            "plan": copy.deepcopy(plan),
+            "client_manager": self.client_manager.get_state(),
+            "model_weights": model_weights,
+            "optimizer_state": self.model_wrapper.get_optimizer_state(),
+        }
+        return payload
+
+    def _save_checkpoint(self, plan: dict):
+        """Persist the current training state to disk."""
+        try:
+            os.makedirs(self._checkpoint_dir, exist_ok=True)
+        except Exception:
+            logging.exception("Failed to create checkpoint directory %s", self._checkpoint_dir)
+            return
+
+        payload = self._checkpoint_payload(plan)
+        tmp_path = os.path.join(
+            self._checkpoint_dir,
+            f".tmp_ckpt_{int(time.time() * 1000)}.pt",
+        )
+        try:
+            torch.save(payload, tmp_path)
+            os.replace(tmp_path, self._checkpoint_file)
+            logging.info("Checkpoint saved for round %d at %s", self.round, self._checkpoint_file)
+        except Exception:
+            logging.exception("Failed to save checkpoint to %s", self._checkpoint_file)
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except Exception:
+                pass
+
+    def _maybe_checkpoint(self, plan: dict):
+        """Checkpoint at configured intervals."""
+        if self.checkpoint_interval is None or self.checkpoint_interval <= 0:
+            return
+        interval = max(1, int(self.checkpoint_interval))
+        if self.round % interval != 0:
+            return
+        self._save_checkpoint(plan)
+
 
     # ----------------------------------------------------------------------
     #  Basic env / comms
     # ----------------------------------------------------------------------
     def setup_env(self):
         """Set up experiments environment and server optimizer"""
-        self.setup_seed(seed=1)
+        self.setup_seed(seed=self.base_seed)
+        if self._resume_random_state is not None:
+            try:
+                random.setstate(self._resume_random_state)
+            except Exception:
+                logging.exception("Failed to restore Python RNG state from checkpoint")
+            self._resume_random_state = None
+        if self._resume_numpy_state is not None:
+            try:
+                np.random.set_state(self._resume_numpy_state)
+            except Exception:
+                logging.exception("Failed to restore NumPy RNG state from checkpoint")
+            self._resume_numpy_state = None
+        if self._resume_torch_state is not None:
+            try:
+                torch.random.set_rng_state(self._resume_torch_state)
+            except Exception:
+                logging.exception("Failed to restore Torch RNG state from checkpoint")
+            self._resume_torch_state = None
+        if self._resume_cuda_states is not None and torch.cuda.is_available():
+            try:
+                torch.cuda.random.set_rng_state_all(self._resume_cuda_states)
+            except Exception:
+                logging.warning("Unable to restore CUDA RNG states during resume.")
+            self._resume_cuda_states = None
 
-    def setup_seed(self, seed=1):
+    def setup_seed(self, seed=None):
         """Set global random seed for better reproducibility
 
         Args:
             seed (int): random seed
 
         """
+        if seed is None:
+            seed = 233
         torch.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
         np.random.seed(seed)
         random.seed(seed)
         torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
     def init_control_communication(self):
         """Create communication channel between coordinator and executor.
@@ -284,6 +578,23 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         self.model_weights = self.model_wrapper.get_weights()
 
+        if self._resume_model_weights is not None:
+            try:
+                self.model_wrapper.set_weights(self._resume_model_weights, is_aggregator=True)
+                self.model_weights = self.model_wrapper.get_weights()
+                logging.info("Restored model weights from checkpoint.")
+            except Exception:
+                logging.exception("Failed to restore model weights from checkpoint.")
+            self._resume_model_weights = None
+
+        if self._resume_optimizer_state:
+            try:
+                self.model_wrapper.load_optimizer_state(self._resume_optimizer_state)
+                logging.info("Restored optimizer state from checkpoint.")
+            except Exception:
+                logging.exception("Failed to restore optimizer state from checkpoint.")
+            self._resume_optimizer_state = None
+
         if self.args.engine == commons.TENSORFLOW:
             self.model_amount_parameters = sum(w.size for w in self.model_weights)
             self.model_size = int(sum(w.size * w.dtype.size for w in self.model_weights) * 8 / 1_000_000)  # Mb
@@ -325,7 +636,11 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         # sample_mode: random, oort, pyramidfl or bliss
 
-        return ClientManager(args.sample_mode, args=args)
+        return ClientManager(
+            args.sample_mode,
+            args=args,
+            sample_seed=getattr(args, "sample_seed", 233),
+        )
 
     # ======================================================================
     #                     A D A P T I V E   H E L P E R S
@@ -453,9 +768,11 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         """
         self.registered_executor_info.add(executorId)
+        ip = self.executor_peers.get(executorId, "unknown")
         logging.info(
-            "Received executor %s information, %d/%d",
+            "Received executor %s information (ip=%s), %d/%d",
             executorId,
+            ip,
             len(self.registered_executor_info),
             len(self.executors),
         )
@@ -630,13 +947,19 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                     extra_kwargs["steps"] = int(results["iters"])  # alias for clarity in selector
                 except Exception:
                     pass
+            # Update per-round time breakdown with actual iterations if planned
+            try:
+                if cid in self._client_time_breakdown:
+                    self._client_time_breakdown[cid]["iters"] = int(results.get("iters", self._client_time_breakdown[cid].get("iters", 0)))
+            except Exception:
+                pass
 
         self.client_manager.register_feedback(
             cid,
             results["utility"],
             time_stamp=self.round,
             duration=dur_for_feedback,
-            success=True,
+            success=bool(results.get("success", True)),
             **extra_kwargs,
         )
 
@@ -652,40 +975,85 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         """
 
         upd = results["update_weight"]
+        client_id = results.get("client_id")
+        try:
+            client_id = int(client_id)
+        except Exception:
+            client_id = len(self._round_update_cache)
 
         if self._is_first_result_in_round():
             if isinstance(upd, dict):
                 self.param_order = list(upd.keys())
-                self.model_weights = {k: v.copy() for k, v in upd.items()}
             else:
                 self.param_order = list(range(len(upd)))
-                self.model_weights = [w.copy() for w in upd]
-            return
+            self._round_update_cache = {}
 
         if isinstance(upd, dict):
-            for k, v in upd.items():
-                self.model_weights[k] += v
+            self._round_update_cache[client_id] = {
+                k: v.copy() if hasattr(v, "copy") else v for k, v in upd.items()
+            }
         else:
-            for i, v in enumerate(upd):
-                self.model_weights[i] += v
+            self._round_update_cache[client_id] = [
+                w.copy() if hasattr(w, "copy") else w for w in upd
+            ]
 
-        if self._is_last_result_in_round():
-            denom = float(self.tasks_round)
+        if not self._is_last_result_in_round():
+            return
 
-            if isinstance(self.model_weights, dict):
-                to_send = []
+        denom = float(self.tasks_round) if self.tasks_round else 1.0
+        ordered_ids = sorted(self._round_update_cache.keys())
+        if not ordered_ids:
+            return
+
+        first_update = self._round_update_cache[ordered_ids[0]]
+
+        if isinstance(first_update, dict):
+            sum_weights = {
+                k: np.zeros_like(first_update[k]) for k in self.param_order
+            }
+            for cid in ordered_ids:
+                upd_dict = self._round_update_cache[cid]
                 for k in self.param_order:
-                    v = self.model_weights[k]
-                    v = v.astype(np.float32) if np.issubdtype(v.dtype, np.integer) else v
-                    self.model_weights[k] = v / denom
-                    to_send.append(self.model_weights[k])
-            else:
-                to_send = [w / denom for w in self.model_weights]
+                    sum_weights[k] += upd_dict[k]
 
-            self.model_wrapper.set_weights(
-                copy.deepcopy(to_send),
-                client_training_results=self.client_training_results,
+            to_send = []
+            for k in self.param_order:
+                avg = sum_weights[k] / denom
+                if isinstance(avg, np.ndarray) and np.issubdtype(avg.dtype, np.integer):
+                    avg = avg.astype(np.float32)
+                sum_weights[k] = avg
+                to_send.append(avg)
+            self.model_weights = sum_weights
+        else:
+            num_params = len(first_update)
+            sum_weights = [
+                np.zeros_like(first_update[i]) for i in range(num_params)
+            ]
+            for cid in ordered_ids:
+                upd_list = self._round_update_cache[cid]
+                for idx in range(num_params):
+                    sum_weights[idx] += upd_list[idx]
+
+            avg_list = []
+            for arr in sum_weights:
+                avg = arr / denom
+                if isinstance(avg, np.ndarray) and np.issubdtype(avg.dtype, np.integer):
+                    avg = avg.astype(np.float32)
+                avg_list.append(avg)
+            self.model_weights = avg_list
+            to_send = avg_list
+
+        self._round_update_cache = {}
+
+        if self.args.gradient_policy in ["q-fedavg"]:
+            self.client_training_results.sort(
+                key=lambda r: int(r.get("client_id", 0))
             )
+
+        self.model_wrapper.set_weights(
+            copy.deepcopy(to_send),
+            client_training_results=self.client_training_results,
+        )
 
     # ----------------------------------------------------------------------
     #  Testing
@@ -759,7 +1127,10 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             - We have all updates; we advance the clock, increment `round`,
               apply LR decay for the new round, checkpoint, then select & dispatch it.
         """
-        bootstrap = (self.tasks_round == 0 and len(self.stats_util_accumulator) == 0)
+        has_resume_plan = bool(self._resume_plan)
+        bootstrap = has_resume_plan or (
+            self.tasks_round == 0 and len(self.stats_util_accumulator) == 0
+        )
 
         # ------------------------------------------------------------------
         # 0) BOOTSTRAP / RESUME
@@ -767,114 +1138,132 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         if bootstrap:
             logging.info("Bootstrap: BEGINNING of round %d", self.round)
 
-            # === Select & schedule THIS round ===
-            online_clients = self.client_manager.getOnlineClients(self.global_virtual_clock)
+            resumed_plan = False
+            plan_to_save = None
 
-            self.sampled_participants = self.select_participants(
-                select_num_participants=self.args.num_participants,
-                overcommitment=self.args.overcommitment,
-            )
-
-            if self.args.adaptive_training:
-                clients_to_run = self.sampled_participants
-                self.tasks_round = self.args.num_participants
-                self.virtual_client_clock = {}
-                self.flatten_client_duration = np.array([])
-                self.round_duration = 0.0
-                self.round_stragglers = []
+            if has_resume_plan:
+                plan = copy.deepcopy(self._resume_plan)
+                self._resume_plan = None
+                clients_to_run = self._apply_round_plan(plan)
+                round_stragglers = list(plan.get("round_stragglers", []))
+                resumed_plan = True
+                plan_to_save = copy.deepcopy(plan)
             else:
-                (
-                    clients_to_run,
-                    round_stragglers,
-                    virtual_client_clock,
-                    round_duration,
-                    flatten_client_duration,
-                ) = self.tictak_client_tasks(
-                    self.sampled_participants, self.args.num_participants
+                online_clients = self.client_manager.getOnlineClients(self.global_virtual_clock)
+
+                self.sampled_participants = self.select_participants(
+                    select_num_participants=self.args.num_participants,
+                    overcommitment=self.args.overcommitment,
                 )
-                self.tasks_round = len(clients_to_run)
-                self.virtual_client_clock = virtual_client_clock
-                self.flatten_client_duration = np.array(flatten_client_duration)
-                self.round_duration = round_duration
-                self.round_stragglers = round_stragglers
 
-                # Build per-client non-adaptive time breakdown (download/compute/upload)
-                self._client_time_breakdown = {}
-                for cid in clients_to_run:
-                    meta = self.client_manager.getClient(cid)
-                    # dropout (PyramidFL override) for this cid if any
-                    drop_p = 0.0
-                    local_steps = getattr(self.args, "local_steps", 0)
-                    if self.client_manager.mode == "pyramidfl":
-                        ov = self.client_manager.get_pyramidfl_conf(cid) or {}
-                        drop_p = float(ov.get("dropout_p", 0.0) or 0.0)
-                        local_steps = int(ov.get("local_steps", local_steps))
-                    # t_dl, t_comp, t_total
-                    t_dl = meta.get_download_time(
-                        cur_time=self.global_virtual_clock, model_size_mb=self.model_size, clock_factor=self.args.clock_factor
+                round_stragglers = []
+                if self.args.adaptive_training:
+                    clients_to_run = self.sampled_participants
+                    self.tasks_round = self.args.num_participants
+                    self.virtual_client_clock = {}
+                    self.flatten_client_duration = np.array([])
+                    self.round_duration = 0.0
+                    self.round_stragglers = []
+                else:
+                    (
+                        clients_to_run,
+                        round_stragglers,
+                        virtual_client_clock,
+                        round_duration,
+                        flatten_client_duration,
+                    ) = self.tictak_client_tasks(
+                        self.sampled_participants, self.args.num_participants
                     )
-                    t_comp, t_total = meta.get_times_with_dropout(
-                        cur_time=self.global_virtual_clock,
-                        batch_size=self.args.batch_size,
-                        local_steps=local_steps if local_steps else self.args.local_steps,
-                        model_size=self.model_size,
-                        model_amount_parameters=self.model_amount_parameters,
-                        reduction_factor=0.5,
-                        dropout_p=drop_p,
-                        clock_factor=self.args.clock_factor,
-                    )
-                    t_ul = max(0.0, t_total - t_dl - t_comp)
-                    self._client_time_breakdown[int(cid)] = {
-                        "t_dl": float(t_dl), "t_comp": float(t_comp), "t_ul": float(t_ul),
-                        "iters": int(local_steps if local_steps else self.args.local_steps),
-                        "dropout_frac": float(drop_p)
-                    }
-            
-            self._pre_util_map = {}
-            if self.client_manager.mode in ("oort", "pyramidfl"):
-                try:
-                    metrics = self.client_manager.getAllMetrics() or {}
+                    self.tasks_round = len(clients_to_run)
+                    self.virtual_client_clock = virtual_client_clock
+                    self.flatten_client_duration = np.array(flatten_client_duration)
+                    self.round_duration = round_duration
+                    self.round_stragglers = round_stragglers
+
+                    # Build per-client non-adaptive time breakdown (download/compute/upload)
+                    self._client_time_breakdown = {}
+
+                    def _fill_breakdown(cid: int):
+                        meta = self.client_manager.getClient(cid)
+                        # dropout (PyramidFL override) for this cid if any
+                        drop_p = 0.0
+                        local_steps = getattr(self.args, "local_steps", 0)
+                        if self.client_manager.mode == "pyramidfl":
+                            ov = self.client_manager.get_pyramidfl_conf(cid) or {}
+                            drop_p = float(ov.get("dropout_p", 0.0) or 0.0)
+                            local_steps = int(ov.get("local_steps", local_steps))
+                        # t_dl, t_comp, t_total
+                        t_dl = meta.get_download_time(
+                            cur_time=self.global_virtual_clock,
+                            model_size_mb=self.model_size,
+                            clock_factor=self.args.clock_factor,
+                        )
+                        t_comp, t_total = meta.get_times_with_dropout(
+                            cur_time=self.global_virtual_clock,
+                            batch_size=self.args.batch_size,
+                            local_steps=local_steps if local_steps else self.args.local_steps,
+                            model_size=self.model_size,
+                            model_amount_parameters=self.model_amount_parameters,
+                            reduction_factor=0.5,
+                            dropout_p=drop_p,
+                            clock_factor=self.args.clock_factor,
+                        )
+                        t_ul = max(0.0, t_total - t_dl - t_comp)
+                        self._client_time_breakdown[int(cid)] = {
+                            "t_dl": float(t_dl),
+                            "t_comp": float(t_comp),
+                            "t_ul": float(t_ul),
+                            "iters": int(local_steps if local_steps else self.args.local_steps),
+                            "dropout_frac": float(drop_p),
+                        }
+
+                    # plan times for both top-K and stragglers (active-throughout candidates)
                     for cid in clients_to_run:
-                        rec = metrics.get(cid, {})
-                        self._pre_util_map[int(cid)] = float(rec.get("reward", 0.0))
-                except Exception:
-                    logging.exception("[logging] could not gather pre-utility map")
+                        _fill_breakdown(int(cid))
+                    for cid in round_stragglers:
+                        _fill_breakdown(int(cid))
 
-            # ── Bliss predictions (seen/unseen) for this round, when applicable
-            self._bliss_pred_seen, self._bliss_pred_unseen = {}, {}
-            if self.client_manager.mode == "bliss":
-                try:
-                    m = self.client_manager.getAllMetrics() or {}
-                    self._bliss_pred_seen   = dict(m.get("pred_seen",   {}))
-                    self._bliss_pred_unseen = dict(m.get("pred_unseen", {}))
-                except Exception:
-                    logging.exception("[logging] could not retrieve Bliss predictions")
+                self._pre_util_map = {}
+                if self.client_manager.mode in ("oort", "pyramidfl"):
+                    try:
+                        metrics = self.client_manager.getAllMetrics() or {}
+                        # include both run and straggler candidates (active throughout)
+                        for cid in list(clients_to_run) + list(round_stragglers):
+                            rec = metrics.get(cid, {})
+                            self._pre_util_map[int(cid)] = float(rec.get("reward", 0.0))
+                    except Exception:
+                        logging.exception("[logging] could not gather pre-utility map")
 
-            # Reset per-round accumulators that will be filled during the round
-            self.completed_clients = []
-            self.failed_clients = []
-            self._client_round_utils = {}
+                # ── Bliss predictions (seen/unseen) for this round, when applicable
+                self._bliss_pred_seen, self._bliss_pred_unseen = {}, {}
+                if self.client_manager.mode == "bliss":
+                    try:
+                        m = self.client_manager.getAllMetrics() or {}
+                        self._bliss_pred_seen = dict(m.get("pred_seen", {}))
+                        self._bliss_pred_unseen = dict(m.get("pred_unseen", {}))
+                    except Exception:
+                        logging.exception("[logging] could not retrieve Bliss predictions")
 
-            # Structured round-begin log
-            self._round_begin_payload = {
-                "round": int(self.round),
-                "start_clock": float(self.global_virtual_clock),
-                "pacer": self.client_manager.get_pacer_state(),
-                "online": online_clients,
-                "sampled_overcommitted": list(self.sampled_participants),
-                "to_run": list(clients_to_run),
-                "planned_stragglers": list(self.round_stragglers),
-            }
-            if self._client_time_breakdown:
-                self._round_begin_payload["client_times_planned"] = self._client_time_breakdown
-            if self._pre_util_map:
-                self._round_begin_payload["pre_util"] = self._pre_util_map
-            if self._bliss_pred_seen or self._bliss_pred_unseen:
-                self._round_begin_payload["bliss_pred_seen"] = self._bliss_pred_seen
-                self._round_begin_payload["bliss_pred_unseen"] = self._bliss_pred_unseen
-            self._log_json("ROUND_BEGIN", self._round_begin_payload)
+                # Reset per-round accumulators that will be filled during the round
+                self.completed_clients = []
+                self.failed_clients = []
+                self._client_round_utils = {}
 
-            self.resource_manager.register_tasks(clients_to_run)
+                # Structured round-begin log
+                self._round_begin_payload = {
+                    "round": int(self.round),
+                    "start_clock": float(self.global_virtual_clock),
+                    "pacer": self.client_manager.get_pacer_state(),
+                }
+                self._log_json("ROUND_BEGIN", self._round_begin_payload)
+                plan_to_save = self._collect_current_plan(clients_to_run, self.round_stragglers)
+
+            if plan_to_save is None:
+                plan_to_save = self._collect_current_plan(clients_to_run, self.round_stragglers)
+            self._maybe_checkpoint(plan_to_save)
+
+            if not resumed_plan:
+                self.resource_manager.register_tasks(clients_to_run)
 
             if self.experiment_mode == commons.SIMULATION_MODE:
                 self.sampled_executors = list(self.individual_client_events.keys())
@@ -922,43 +1311,104 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         avg_loss = sum(self.loss_accumulator) / max(1, len(self.loss_accumulator))
 
         prev_round = int(self.round)
-        round_summary = {
+        clock_end = float(self.global_virtual_clock)
+        duration = float(self.round_duration)
+        clock_start = float(clock_end - duration)
+        meta_payload = {
             "round": prev_round,
-            "clock_end": float(self.global_virtual_clock),
-            "duration": float(self.round_duration),
-            "completed": list(self.completed_clients),
-            "stragglers": list(self.round_stragglers),
-            "dropped": list(self.failed_clients),
+            "clock_start": clock_start,
+            "clock_end": clock_end,
+            "duration": duration,
             "loss_avg": float(avg_loss),
+            "completed": sorted(set(self.completed_clients)),
+            "stragglers": sorted(set(self.round_stragglers)),
+            "dropped": sorted(set(self.failed_clients)),
         }
-        if self._client_time_breakdown:
-            round_summary["client_times"] = self._client_time_breakdown
-        if self.client_manager.mode in ("oort", "pyramidfl") and self._pre_util_map:
-            try:
-                metrics = self.client_manager.getAllMetrics() or {}
-                after = {
-                    int(cid): float((metrics.get(cid, {}) or {}).get("reward", 0.0))
-                    for cid in self._pre_util_map.keys()
-                }
-            except Exception:
-                logging.exception("[logging] could not gather post-utility map; falling back to raw client utilities")
-                after = {
-                    int(cid): float(self._client_round_utils.get(cid, 0.0))
-                    for cid in self._pre_util_map.keys()
-                }
-            round_summary["oort_pyr_util_before"] = self._pre_util_map
-            round_summary["oort_pyr_util_after"]  = after
-        if self.client_manager.mode == "bliss":
-            # split actual utilities by seen/unseen, if we have predictions for them
-            if self._bliss_pred_seen:
-                round_summary["bliss_pred_seen"] = self._bliss_pred_seen
-                round_summary["bliss_actual_seen"] = {cid: float(self._client_round_utils.get(cid, 0.0))
-                                                      for cid in self._bliss_pred_seen.keys()}
-            if self._bliss_pred_unseen:
-                round_summary["bliss_pred_unseen"] = self._bliss_pred_unseen
-                round_summary["bliss_actual_unseen"] = {cid: float(self._client_round_utils.get(cid, 0.0))
-                                                        for cid in self._bliss_pred_unseen.keys()}
-        self._log_json("ROUND_SUMMARY", round_summary)
+
+        # Emit per-client information for this round (mode-specific) with metadata
+        try:
+            mode = self.client_manager.mode
+            info_key = f"{mode}_client_information"
+
+            if self.args.adaptive_training:
+                selected_ids = sorted({int(cid) for cid in self.sampled_participants})
+            else:
+                selected_ids = sorted({int(cid) for cid in self.virtual_client_clock.keys()})
+
+            status_map = {}
+            for sid in selected_ids:
+                if sid in self.failed_clients:
+                    status_map[sid] = 'd'
+                elif sid in self.completed_clients:
+                    status_map[sid] = 'c'
+                elif sid in self.round_stragglers:
+                    status_map[sid] = 's'
+                else:
+                    status_map[sid] = 's'
+
+            pre_util = {int(k): float(v) for k, v in (self._pre_util_map or {}).items()}
+            post_util = {}
+            if mode in ("oort", "pyramidfl"):
+                try:
+                    metrics = self.client_manager.getAllMetrics() or {}
+                except Exception:
+                    logging.exception("[logging] could not gather post-utility map; falling back to raw client utilities")
+                    metrics = {}
+                for sid in selected_ids:
+                    val = None
+                    if metrics:
+                        rec = metrics.get(sid, {}) or {}
+                        val = rec.get("reward", None)
+                    if val is None:
+                        val = self._client_round_utils.get(sid, 0.0)
+                    post_util[sid] = float(val)
+
+            client_info = {}
+            for sid in selected_ids:
+                tb = self._client_time_breakdown.get(sid, {})
+                t_dl = float(tb.get("t_dl", 0.0))
+                t_comp = float(tb.get("t_comp", 0.0))
+                t_ul = float(tb.get("t_ul", 0.0))
+                st = status_map.get(sid, 's')
+
+                if mode == 'random':
+                    client_info[sid] = [t_dl, t_comp, t_ul, st]
+                elif mode in ('oort', 'pyramidfl'):
+                    iters = int(tb.get("iters", 0)) if mode == 'pyramidfl' else 0
+                    dropf = float(tb.get("dropout_frac", 0.0)) if mode == 'pyramidfl' else 0.0
+                    pu = float(pre_util.get(sid, 0.0))
+                    cu = float(post_util.get(sid, self._client_round_utils.get(sid, 0.0)))
+                    client_info[sid] = [t_dl, t_comp, t_ul, iters, dropf, pu, cu, st]
+                elif mode == 'bliss':
+                    it_p1 = int(tb.get("iters_phase1", 0))
+                    it_p2 = int(tb.get("iters_phase2", 0))
+                    dropf = float(tb.get("dropout_frac", 0.0))
+                    if sid in (self._bliss_pred_seen or {}):
+                        pred = float(self._bliss_pred_seen[sid])
+                        seen_flag = True
+                    elif sid in (self._bliss_pred_unseen or {}):
+                        pred = float(self._bliss_pred_unseen[sid])
+                        seen_flag = False
+                    else:
+                        pred = 0.0
+                        seen_flag = False
+                    cu = float(self._client_round_utils.get(sid, 0.0))
+                    client_info[sid] = [t_dl, t_comp, t_ul, it_p1, it_p2, dropf, pred, cu, st, bool(seen_flag)]
+
+            payload = {
+                "round": meta_payload["round"],
+                "clock_start": meta_payload["clock_start"],
+                "clock_end": meta_payload["clock_end"],
+                "duration": meta_payload["duration"],
+                "loss_avg": meta_payload["loss_avg"],
+                "completed": meta_payload["completed"],
+                "stragglers": meta_payload["stragglers"],
+                "dropped": meta_payload["dropped"],
+                info_key: client_info,
+            }
+            self._log_json("CLIENT_INFO", payload)
+        except Exception:
+            logging.exception("[logging] failed to emit per-client information payload")
 
         # reset per-round buffers (safety)
         self._pre_util_map.clear()
@@ -989,6 +1439,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             self.flatten_client_duration = np.array([])
             self.round_duration = 0.0
             self.round_stragglers = []
+            self._client_time_breakdown = {}
         else:
             (
                 clients_to_run,
@@ -1005,6 +1456,78 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             self.flatten_client_duration = np.array(flatten_client_duration)
             self.round_duration = round_duration
             self.round_stragglers = round_stragglers
+            self._client_time_breakdown = {}
+
+            def _fill_breakdown_next(cid: int):
+                meta = self.client_manager.getClient(cid)
+                drop_p = 0.0
+                local_steps = getattr(self.args, "local_steps", 0)
+                if self.client_manager.mode == "pyramidfl":
+                    ov = self.client_manager.get_pyramidfl_conf(cid) or {}
+                    drop_p = float(ov.get("dropout_p", 0.0) or 0.0)
+                    local_steps = int(ov.get("local_steps", local_steps))
+                t_dl = meta.get_download_time(
+                    cur_time=self.global_virtual_clock,
+                    model_size_mb=self.model_size,
+                    clock_factor=self.args.clock_factor,
+                )
+                t_comp, t_total = meta.get_times_with_dropout(
+                    cur_time=self.global_virtual_clock,
+                    batch_size=self.args.batch_size,
+                    local_steps=local_steps if local_steps else self.args.local_steps,
+                    model_size=self.model_size,
+                    model_amount_parameters=self.model_amount_parameters,
+                    reduction_factor=0.5,
+                    dropout_p=drop_p,
+                    clock_factor=self.args.clock_factor,
+                )
+                t_ul = max(0.0, t_total - t_dl - t_comp)
+                self._client_time_breakdown[int(cid)] = {
+                    "t_dl": float(t_dl),
+                    "t_comp": float(t_comp),
+                    "t_ul": float(t_ul),
+                    "iters": int(local_steps if local_steps else self.args.local_steps),
+                    "dropout_frac": float(drop_p),
+                }
+
+            for cid in clients_to_run:
+                _fill_breakdown_next(int(cid))
+            for cid in self.round_stragglers:
+                _fill_breakdown_next(int(cid))
+
+        self._pre_util_map = {}
+        if self.client_manager.mode in ("oort", "pyramidfl"):
+            try:
+                metrics = self.client_manager.getAllMetrics() or {}
+                for cid in list(clients_to_run) + list(self.round_stragglers):
+                    rec = metrics.get(cid, {})
+                    self._pre_util_map[int(cid)] = float(rec.get("reward", 0.0))
+            except Exception:
+                logging.exception("[logging] could not gather pre-utility map")
+
+        self._bliss_pred_seen, self._bliss_pred_unseen = {}, {}
+        if self.client_manager.mode == "bliss":
+            try:
+                m = self.client_manager.getAllMetrics() or {}
+                self._bliss_pred_seen = dict(m.get("pred_seen", {}))
+                self._bliss_pred_unseen = dict(m.get("pred_unseen", {}))
+            except Exception:
+                logging.exception("[logging] could not retrieve Bliss predictions")
+
+        self.completed_clients = []
+        self.failed_clients = []
+        self._client_round_utils = {}
+
+        _ = self.client_manager.getOnlineClients(self.global_virtual_clock)
+        self._round_begin_payload = {
+            "round": int(self.round),
+            "start_clock": float(self.global_virtual_clock),
+            "pacer": self.client_manager.get_pacer_state(),
+        }
+        self._log_json("ROUND_BEGIN", self._round_begin_payload)
+
+        plan_to_save = self._collect_current_plan(clients_to_run, self.round_stragglers)
+        self._maybe_checkpoint(plan_to_save)
 
         logging.info(
             "Selected %d participants to run: %s",
@@ -1088,7 +1611,24 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         Returns:
             string, bool, or bytes: The deserialized response object from executor.
         """
-        return pickle.loads(responses)
+        if responses is None:
+            return None
+        if isinstance(responses, bytearray):
+            responses = bytes(responses)
+        if isinstance(responses, str):
+            responses = responses.encode("latin1")
+
+        try:
+            return pickle.loads(responses)
+        except UnicodeDecodeError:
+            # Handle payloads containing legacy 8-bit pickled strings.
+            return pickle.loads(responses, encoding="latin1")
+        except Exception:
+            logging.exception(
+                "Failed to deserialize response payload of size %s",
+                len(responses) if hasattr(responses, "__len__") else "unknown",
+            )
+            raise
 
     def serialize_response(self, responses):
         """Serialize the response to send to server upon assigned job completion
@@ -1100,7 +1640,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             bytes: The serialized response object to server.
 
         """
-        return pickle.dumps(responses)
+        return pickle.dumps(responses, protocol=pickle.HIGHEST_PROTOCOL)
 
     # ----------------------------------------------------------------------
     #  Testing completion
@@ -1273,6 +1813,21 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         """
         executor_id = request.executor_id
         executor_info = self.deserialize_response(request.executor_info)
+        # Capture peer IP for logging/debugging
+        try:
+            peer = context.peer()  # e.g., 'ipv4:127.0.0.1:54321' or 'ipv6:[::1]:54321'
+            ip = peer
+            if peer.startswith('ipv4:'):
+                parts = peer.split(':')
+                if len(parts) >= 3:
+                    ip = parts[1]
+            elif peer.startswith('ipv6:'):
+                lb = peer.find('['); rb = peer.find(']')
+                if lb != -1 and rb != -1 and rb > lb:
+                    ip = peer[lb+1:rb]
+            self.executor_peers[executor_id] = ip
+        except Exception:
+            pass
         if executor_id not in self.individual_client_events:
             self.individual_client_events[executor_id] = collections.deque()
         else:

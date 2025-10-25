@@ -41,6 +41,7 @@ class Executor(object):
         )
 
         self.args = args
+        self.base_seed = getattr(args, "sample_seed", None)
         self.num_executors = args.num_executors
         # ======== env information ========
         self.this_rank = args.this_rank
@@ -78,23 +79,29 @@ class Executor(object):
     def setup_env(self):
         """Set up experiments environment"""
         logging.info(f"(EXECUTOR:{self.this_rank}) is setting up environ ...")
-        self.setup_seed(seed=1)
+        base = self.base_seed if self.base_seed is not None else 233
+        per_executor_seed = (int(base) + int(self.this_rank)) % (2**32)
+        self.setup_seed(seed=per_executor_seed)
 
     def setup_communication(self):
         """Set up grpc connection"""
         self.init_control_communication()
         self.init_data_communication()
 
-    def setup_seed(self, seed=1):
+    def setup_seed(self, seed=None):
         """Set random seed for reproducibility
 
         Args:
             seed (int): random seed
 
         """
+        if seed is None:
+            seed = 233
         torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
-        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.benchmark = False
         np.random.seed(seed)
         random.seed(seed)
 
@@ -125,8 +132,13 @@ class Executor(object):
         # load data partitionxr (entire_train_data)
         logging.info(f"Data partitioner starts ...\nNumber of Paricipants = {self.args.num_participants}")
 
+        partition_seed = self.base_seed if self.base_seed is not None else 233
+
         training_sets = DataPartitioner(
-            data=train_dataset, args=self.args, numOfClass=self.args.num_class
+            data=train_dataset,
+            args=self.args,
+            numOfClass=self.args.num_class,
+            seed=int(partition_seed) % (2**32),
         )
         # count how many real clients appear in the CSV so every one
         # gets its own shard (1-to-1 mapping)
@@ -143,6 +155,7 @@ class Executor(object):
             args=self.args,
             numOfClass=self.args.num_class,
             isTest=True,
+            seed=(int(partition_seed) + 1) % (2**32),
         )
         testing_sets.partition_data_helper(num_clients=self.num_executors)
 
@@ -188,7 +201,23 @@ class Executor(object):
             ServerResponse defined at job_api.proto: The deserialized response object from server.
 
         """
-        return pickle.loads(responses)
+        if responses is None:
+            return None
+        if isinstance(responses, bytearray):
+            responses = bytes(responses)
+        if isinstance(responses, str):
+            responses = responses.encode("latin1")
+
+        try:
+            return pickle.loads(responses)
+        except UnicodeDecodeError:
+            return pickle.loads(responses, encoding="latin1")
+        except Exception:
+            logging.exception(
+                "Failed to deserialize response payload of size %s",
+                len(responses) if hasattr(responses, "__len__") else "unknown",
+            )
+            raise
 
     def serialize_response(self, responses):
         """Serialize the response to send to server upon assigned job completion
@@ -200,7 +229,7 @@ class Executor(object):
             bytes stream: The serialized response object to server.
 
         """
-        return pickle.dumps(responses)
+        return pickle.dumps(responses, protocol=pickle.HIGHEST_PROTOCOL)
 
     def UpdateModel(self, model_weights):
         """Receive the broadcasted global model for current round
@@ -353,7 +382,12 @@ class Executor(object):
         """
         self.model_adapter.set_weights(model, is_aggregator=False)
         conf.client_id = client_id
-        conf.tokenizer = tokenizer
+        # Always source tokenizer from fllibs at runtime to avoid stale None from star-import.
+        try:
+            import fedscale.cloud.fllibs as fllibs
+            conf.tokenizer = getattr(conf, 'tokenizer', None) or getattr(fllibs, 'tokenizer', None)
+        except Exception:
+            conf.tokenizer = None
         client_data = (
             self.training_sets
             if self.args.task == "rl"
@@ -383,13 +417,17 @@ class Executor(object):
 
         """
         self.model_adapter.set_weights(model, is_aggregator=False)
-        test_config = self.override_conf(
-            {
-                "rank": self.this_rank,
-                "memory_capacity": self.args.memory_capacity,
-                "tokenizer": tokenizer,
-            }
-        )
+        # Pull live tokenizer from fllibs to pass into testing path
+        try:
+            import fedscale.cloud.fllibs as fllibs
+            live_tok = getattr(fllibs, 'tokenizer', None)
+        except Exception:
+            live_tok = None
+        test_config = self.override_conf({
+            "rank": self.this_rank,
+            "memory_capacity": self.args.memory_capacity,
+            "tokenizer": live_tok,
+        })
         client = self.get_client_trainer(test_config)
         data_loader = select_dataset(
             self.this_rank,
