@@ -132,13 +132,8 @@ class Executor(object):
         # load data partitionxr (entire_train_data)
         logging.info(f"Data partitioner starts ...\nNumber of Paricipants = {self.args.num_participants}")
 
-        partition_seed = self.base_seed if self.base_seed is not None else 233
-
         training_sets = DataPartitioner(
-            data=train_dataset,
-            args=self.args,
-            numOfClass=self.args.num_class,
-            seed=int(partition_seed) % (2**32),
+            data=train_dataset, args=self.args, numOfClass=self.args.num_class
         )
         # count how many real clients appear in the CSV so every one
         # gets its own shard (1-to-1 mapping)
@@ -155,7 +150,6 @@ class Executor(object):
             args=self.args,
             numOfClass=self.args.num_class,
             isTest=True,
-            seed=(int(partition_seed) + 1) % (2**32),
         )
         testing_sets.partition_data_helper(num_clients=self.num_executors)
 
@@ -462,7 +456,8 @@ class Executor(object):
                 self.dispatch_worker_events(response)
                 break
             except Exception as e:
-                logging.warning(
+                # Connection retries are expected during orchestrator startup; keep log noise low.
+                logging.info(
                     f"Failed to connect to aggregator {e}. Will retry in 5 sec."
                 )
                 time.sleep(5)

@@ -1,7 +1,6 @@
 import logging
 import math
 import time
-
 import torch
 from torch.autograd import Variable
 from overrides import overrides
@@ -45,6 +44,7 @@ class TorchClient(ClientBase):
         :return: training results
         """
         client_id = conf.client_id
+
         tokenizer = conf.tokenizer
 
         model = model.to(device=self.device)
@@ -190,8 +190,8 @@ class TorchClient(ClientBase):
         for data_pair in client_data:
             if conf.task == 'nlp':
                 (data, _) = data_pair
-                # NOTE: assumes `tokenizer` is in scope via enclosing train(); if not, pass it via conf
-                data, target = mask_tokens(data, tokenizer, conf, device=self.device)
+                # Use tokenizer from conf to avoid scope issues
+                data, target = mask_tokens(data, conf.tokenizer, conf, device=self.device)
             elif conf.task == 'voice':
                 (data, target, input_percentages, target_sizes), _ = data_pair
                 input_sizes = input_percentages.mul_(int(data.size(3))).int()

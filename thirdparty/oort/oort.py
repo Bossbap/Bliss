@@ -9,8 +9,9 @@ import numpy as np2
 from .utils.lp import *
 
 
-def create_training_selector(args):
-    return _training_selector(args)
+def create_training_selector(args, sample_seed=None):
+    seed = sample_seed if sample_seed is not None else getattr(args, "sample_seed", 233)
+    return _training_selector(args, sample_seed=seed)
 
 class _training_selector(object):
     """Oort's training selector with explicit explore/exploit split."""
@@ -123,19 +124,9 @@ class _training_selector(object):
             rel_change = abs(util_curr - util_last) / baseline
 
             if rel_change <= 0.1:
-                old = self.t_budget
                 self.t_budget += self.pacer_delta
-                logging.info(
-                    "[Oort.Pacer] Plateau at %d: last=%g, curr=%g, Δ/last=%0.2f%% → relax T %.3fs→%.3fs",
-                    self.training_round, util_last, util_curr, 100 * rel_change, old, self.t_budget
-                )
             elif rel_change >= 5.0:
-                old = self.t_budget
                 self.t_budget = max(self.pacer_delta, self.t_budget - self.pacer_delta)
-                logging.info(
-                    "[Oort.Pacer] Surge at %d: last=%g, curr=%g, Δ/last=%0.2f%% → tighten T %.3fs→%.3fs",
-                    self.training_round, util_last, util_curr, 100 * rel_change, old, self.t_budget
-                )
 
             # Expose the new preferred duration to downstream consumers.
             self.args.t_budget = self.t_budget
@@ -175,11 +166,11 @@ class _training_selector(object):
         # Split into unexplored vs explored
         unexplored_keys = [k for k in orderedKeys if self.totalArms[k]['count'] == 0]
         explored_keys   = [k for k in orderedKeys if self.totalArms[k]['count'] >  0]
+        # Trimmed verbose debug logging: candidate sizes / heads omitted
 
         # Preferred duration sourced from pacer T-budget
         self.round_prefer_duration = float(self.t_budget) if self.t_budget > 0 else float('inf')
 
-        # Log pacer line (visible in your plots)
         prev_pd = self._last_round_prefer_duration
         if (prev_pd is None) or (abs(self.round_prefer_duration - prev_pd) > 1e-9):
             logging.info(
@@ -193,6 +184,7 @@ class _training_selector(object):
         # How many from each pool?
         want_explore = int(e * numOfSamples)
         want_exploit = numOfSamples - want_explore
+        # RNG heads intentionally not logged
 
         # Reallocate if one pool is short
         take_explore = min(want_explore, len(unexplored_keys))
@@ -222,6 +214,7 @@ class _training_selector(object):
             staleness     = [cur_time - self.totalArms[k]['time_stamp'] for k in explored_keys]
             max_r, min_r, rng_r, avg_r, clip_r = self._safe_norm(moving_reward, self.args.clip_bound)
             max_s, min_s, rng_s, avg_s, _      = self._safe_norm(staleness, thres=1)
+            # (debug logging removed)
 
             scores = {}
             for k in explored_keys:
@@ -235,11 +228,8 @@ class _training_selector(object):
                     sc *= ((float(self.round_prefer_duration) / max(1e-4, clientDuration)) ** self.args.round_penalty)
                 scores[k] = abs(sc)
 
-            # If all explored scores are identical/zero, sample uniformly
             if scores and max(scores.values()) - min(scores.values()) > 1e-12:
                 sorted_keys = sorted(scores, key=scores.get, reverse=True)
-                # probabilistic sampling from an augmented candidate set,
-                # like upstream Oort (respecting stochasticity)
                 cut_idx = min(take_exploit, len(sorted_keys) - 1)
                 cutoff = scores[sorted_keys[cut_idx]] * self.args.cut_off_util
                 temp_pool = []
@@ -256,6 +246,13 @@ class _training_selector(object):
         picked = picked_explore + picked_exploit
         # Ensure uniqueness and stable order (optional)
         picked = list(dict.fromkeys(picked))
+
+        # Record pools for pacer window accounting (used at next call)
+        self.exploreClients = list(picked_explore)
+        self.exploitClients = list(picked_exploit)
+
+        # Trimmed selection diagnostics
+
         return picked
 
     # ---------- misc (unchanged helpers) ----------
@@ -306,9 +303,71 @@ class _training_selector(object):
             "pacer_delta": float(self.pacer_delta),
             "preferred_duration": (None if self.round_prefer_duration == float('inf') else float(self.round_prefer_duration))
         }
+
+    def get_state(self):
+        """Return a serialisable snapshot of the selector."""
+        return {
+            "totalArms": [(k, v) for k, v in self.totalArms.items()],
+            "training_round": self.training_round,
+            "exploration": self.exploration,
+            "decay_factor": self.decay_factor,
+            "exploration_min": self.exploration_min,
+            "alpha": self.alpha,
+            "t_budget": self.t_budget,
+            "pacer_step": self.pacer_step,
+            "pacer_delta": self.pacer_delta,
+            "round_prefer_duration": self.round_prefer_duration,
+            "sample_window": self.sample_window,
+            "exploitUtilHistory": list(self.exploitUtilHistory),
+            "exploreUtilHistory": list(self.exploreUtilHistory),
+            "exploitClients": list(self.exploitClients),
+            "exploreClients": list(self.exploreClients),
+            "successfulClients": list(self.successfulClients),
+            "unexplored": list(self.unexplored),
+            "blacklist": list(self.blacklist) if self.blacklist is not None else None,
+            "last_round_prefer_duration": self._last_round_prefer_duration,
+            "rng_state": self.rng.getstate(),
+            "np_random_state": np2.random.get_state(),
+        }
+
+    def load_state(self, state):
+        """Restore selector fields from `get_state` output."""
+        if not state:
+            return
+
+        self.totalArms = OrderedDict(state.get("totalArms", []))
+        self.training_round = state.get("training_round", 0)
+        self.exploration = state.get("exploration", self.exploration)
+        self.decay_factor = state.get("decay_factor", self.decay_factor)
+        self.exploration_min = state.get("exploration_min", self.exploration_min)
+        self.alpha = state.get("alpha", self.alpha)
+        self.t_budget = state.get("t_budget", self.t_budget)
+        self.pacer_step = state.get("pacer_step", self.pacer_step)
+        self.pacer_delta = state.get("pacer_delta", self.pacer_delta)
+        self.round_prefer_duration = state.get("round_prefer_duration", self.round_prefer_duration)
+        self.sample_window = state.get("sample_window", self.sample_window)
+        self.exploitUtilHistory = list(state.get("exploitUtilHistory", []))
+        self.exploreUtilHistory = list(state.get("exploreUtilHistory", []))
+        self.exploitClients = list(state.get("exploitClients", []))
+        self.exploreClients = list(state.get("exploreClients", []))
+        self.successfulClients = set(state.get("successfulClients", []))
+        self.unexplored = set(state.get("unexplored", []))
+        blacklist = state.get("blacklist", None)
+        self.blacklist = set(blacklist) if blacklist is not None else None
+        self._last_round_prefer_duration = state.get("last_round_prefer_duration", self._last_round_prefer_duration)
+
+        rng_state = state.get("rng_state")
+        if rng_state is not None:
+            self.rng.setstate(rng_state)
+        np_state = state.get("np_random_state")
+        if np_state is not None:
+            np2.random.set_state(np_state)
+        # ensure downstream components (aggregator/client_manager) see updated pacer budget
+        setattr(self.args, "t_budget", self.t_budget)
     
-def create_pyramid_training_selector(args):
-    return _pyramid_training_selector(args)
+def create_pyramid_training_selector(args, sample_seed=None):
+    seed = sample_seed if sample_seed is not None else getattr(args, "sample_seed", 233)
+    return _pyramid_training_selector(args, sample_seed=seed)
 
 
 class _pyramid_training_selector(_training_selector):
@@ -432,6 +491,17 @@ class _pyramid_training_selector(_training_selector):
 
     def get_overrides(self):
         return self._overrides
+
+    def get_state(self):
+        state = super().get_state()
+        state.update({
+            "overrides": self._overrides,
+        })
+        return state
+
+    def load_state(self, state):
+        super().load_state(state)
+        self._overrides = state.get("overrides", {})
 
 
 def create_testing_selector(data_distribution=None, client_info=None, model_size=None):

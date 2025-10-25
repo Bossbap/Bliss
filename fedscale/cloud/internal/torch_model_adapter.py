@@ -51,3 +51,15 @@ class TorchModelAdapter(ModelAdapterBase):
         Get the instantiated framework specific model including the architecture.
         """
         return self.model
+
+    def get_optimizer_state(self):
+        """Return the optimizer state dict if the server-side optimiser is active."""
+        if self.optimizer is None:
+            return None
+        return self.optimizer.state_dict()
+
+    def load_optimizer_state(self, state):
+        """Restore the optimiser state if available."""
+        if self.optimizer is None or not state:
+            return
+        self.optimizer.load_state_dict(state)

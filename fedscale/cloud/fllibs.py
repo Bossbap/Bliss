@@ -105,11 +105,18 @@ def init_model():
     import_libs()
 
     if parser.args.task == 'nlp':
-        config = AutoConfig.from_pretrained(
-            os.path.join(parser.args.data_dir, parser.args.model + '-config.json'))
+        # Prefer HF model id; avoid constructing local path under data_dir
+        config = AutoConfig.from_pretrained(parser.args.model)
+        logging.info(
+            "Transformer config loaded: model=%s hidden_size=%s embedding_size=%s intermediate_size=%s layers=%s",
+            parser.args.model,
+            getattr(config, 'hidden_size', None),
+            getattr(config, 'embedding_size', None),
+            getattr(config, 'intermediate_size', None),
+            getattr(config, 'num_hidden_layers', None),
+        )
         model = AutoModelWithLMHead.from_config(config)
-        tokenizer = AlbertTokenizer.from_pretrained(
-            parser.args.model, do_lower_case=True)
+        tokenizer = AlbertTokenizer.from_pretrained(parser.args.model, do_lower_case=True)
 
         # model_name = 'google/mobilebert-uncased'
         # config = AutoConfig.from_pretrained(model_name)

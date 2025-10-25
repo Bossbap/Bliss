@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Callable
+from typing import Callable, Optional
 from fedscale.cloud.fllibs import *
 
 
@@ -27,7 +27,8 @@ class ClientMetadata:
         # activity traces
         active: list[int],
         inactive: list[int],
-        peak_throughput
+        peak_throughput,
+        rng_seed: Optional[int] = None,
     ):
         """
         :param host_id:   ID of the executor handling this client
@@ -68,6 +69,7 @@ class ClientMetadata:
 
         # Noise to perturb FLOPS in one round
         self._round_noise = 1.0
+        self._rng = np.random.default_rng(rng_seed)
 
         # most-recent end-to-end latency (sec)
         self.last_duration = None
@@ -327,4 +329,58 @@ class ClientMetadata:
         """One log-normal noise multiplier per round (σ from original code)."""
         # Noise
         mu = np.log(target_mean) - (sigma**2)/2
-        self._round_noise = np.random.lognormal(mean=mu, sigma=sigma)
+        self._round_noise = float(self._rng.lognormal(mean=mu, sigma=sigma))
+
+    # ------------------------------------------------------------------
+    #  Serialisation helpers
+    # ------------------------------------------------------------------
+    def state_dict(self) -> dict:
+        """Return a serialisable snapshot of this metadata record."""
+        return {
+            "host_id": self.host_id,
+            "client_id": self.client_id,
+            "size": self.size,
+            "cpu_flops": float(self.cpu_flops),
+            "gpu_flops": float(self.gpu_flops),
+            "timestamps_livelab": self.timestamps_livelab.tolist(),
+            "rate": self.rate.tolist(),
+            "timestamps_carat": self.timestamps_carat.tolist(),
+            "availability": self.availability.tolist(),
+            "batteryLevel": self.batteryLevel.tolist(),
+            "active": list(self.active),
+            "inactive": list(self.inactive),
+            "peak_throughput": self.peak_throughput,
+            "score": self.score,
+            "last_duration": self.last_duration,
+            "_round_noise": self._round_noise,
+            "rng_state": self._rng.bit_generator.state,
+        }
+
+    @classmethod
+    def from_state(cls, state: dict) -> "ClientMetadata":
+        """Instantiate ClientMetadata from a state dict."""
+        obj = cls(
+            host_id=state["host_id"],
+            client_id=state["client_id"],
+            size=state["size"],
+            cpu_flops=state["cpu_flops"],
+            gpu_flops=state["gpu_flops"],
+            timestamps_livelab=state["timestamps_livelab"],
+            rate=state["rate"],
+            timestamps_carat=state["timestamps_carat"],
+            availability=state["availability"],
+            batteryLevel=state["batteryLevel"],
+            active=state["active"],
+            inactive=state["inactive"],
+            peak_throughput=state["peak_throughput"],
+            rng_seed=None,
+        )
+        obj.score = state.get("score", obj.score)
+        obj.last_duration = state.get("last_duration")
+        obj._round_noise = state.get("_round_noise", obj._round_noise)
+
+        rng_state = state.get("rng_state")
+        if rng_state is not None:
+            obj._rng = np.random.default_rng()
+            obj._rng.bit_generator.state = rng_state
+        return obj

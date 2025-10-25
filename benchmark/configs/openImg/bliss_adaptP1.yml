@@ -12,9 +12,9 @@ worker_ips:
     - 129.104.252.34:[4]
     - 129.104.252.39:[4]
     - 129.104.252.43:[4]
-    - 129.104.252.49:[4]
     - 129.104.252.45:[4]
-    - 129.104.252.53:[4]
+    - 129.104.252.49:[4]
+    - 129.104.252.54:[4]
 
 exp_path: /users/eleves-a/2024/baptiste.geisenberger/FedScale/fedscale/cloud
 
@@ -48,9 +48,10 @@ job_conf:
     - use_cuda: True
     - num_loaders: 2
     - clock_factor: 30
+    - checkpoint_interval: 50
+    # - resume_from: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark/logs/google_speech/1023_195236/checkpoints
 
     - model: shufflenet_v2_x2_0                 # Models: e.g., shufflenet_v2_x2_0, mobilenet_v2, resnet34, albert-base-v2
-    - openimg_size: 256
     - gradient_policy: fed-prox                 # {"fed-yogi", "fed-prox", "fed-avg"}, "fed-avg" by default
     - proxy_mu: 0.001
 
@@ -58,23 +59,38 @@ job_conf:
     - eval_interval: 5                            # How many rounds to run a testing on the testing set
     - rounds: 500                          # Number of rounds to run this training. We use 1000 in our paper, while it may converge w/ ~400 rounds
     - local_steps: 20
-    - batch_size: 20
-    - filter_less: 20
-    - learning_rate: 0.04
+    - batch_size: 32
+    - filter_less: 32
+    - learning_rate: 0.02
     - decay_factor: 0.98
     - decay_round: 10
     - weight_decay: 4e-5
     - test_bsz: 20
-    
-    - sample_mode: oort
-    - pacer_delta: 10
-    - pacer_step: 20
-    - exploration_alpha: 0.3
-    - exploration_factor: 0.9
-    - exploration_decay: 0.98
-    - exploration_min: 0.2
-    - sample_window: 20 
-    - round_penalty: 2.0
-    - round_threshold: 10
-    - blacklist_rounds: -1
-    - overcommitment: 1.3
+    - overcomitmment: 1.1
+
+    - sample_mode: bliss
+    - number_clients_to_refresh_utility: 500
+    - number_clients_to_predict_utility: 500
+    - amount_clients_predict_train_set: 1000
+    - amount_clients_refresh_train_set: 1500
+    - ema_alpha: 0.9
+
+    - adaptive_training: true
+    - run_phase_2: false
+    - t_budget: 120
+    - pacer_step: 10
+    - pacer_delta: 50
+
+    - g_model: xgboost
+    - xgboost_g_n_estimators: 200
+    - xgboost_g_learning_rate: 0.02
+    - xgboost_g_max_depth: 6
+    - xgboost_g_subsample: 0.7
+    - xgboost_g_colsample_bytree: 0.7
+
+    - h_model: xgboost
+    - xgboost_h_n_estimators: 200
+    - xgboost_h_learning_rate: 0.05
+    - xgboost_h_max_depth: 3
+    - xgboost_h_subsample: 0.7
+    - xgboost_h_colsample_bytree: 1.0

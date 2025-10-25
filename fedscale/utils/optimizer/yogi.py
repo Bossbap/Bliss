@@ -34,3 +34,25 @@ class YoGi:
             update_gradients = gradients
 
         return update_gradients
+
+    def state_dict(self):
+        """Return a serialisable snapshot of the optimizer state."""
+        return {
+            "eta": self.eta,
+            "tau": self.tau,
+            "beta": self.beta,
+            "beta2": self.beta2,
+            "m_t": [t.detach().cpu().clone() for t in self.m_t],
+            "v_t": [t.detach().cpu().clone() for t in self.v_t],
+        }
+
+    def load_state_dict(self, state):
+        """Restore optimizer state from `state_dict` output."""
+        if not state:
+            return
+        self.eta = state.get("eta", self.eta)
+        self.tau = state.get("tau", self.tau)
+        self.beta = state.get("beta", self.beta)
+        self.beta2 = state.get("beta2", self.beta2)
+        self.m_t = [tensor.clone() for tensor in state.get("m_t", [])]
+        self.v_t = [tensor.clone() for tensor in state.get("v_t", [])]

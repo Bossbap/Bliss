@@ -1,13 +1,16 @@
 import torch
 from torch.nn.utils.rnn import pad_sequence
 
-from fedscale.cloud.fllibs import *
+# Import fllibs as a module so we always see the current tokenizer
+import fedscale.cloud.fllibs as fllibs
 
 
 def collate(examples):
-    if tokenizer._pad_token is None:
+    # Use runtime tokenizer from fllibs; fall back to default padding if missing
+    tok = getattr(fllibs, "tokenizer", None)
+    if tok is None or getattr(tok, "_pad_token", None) is None:
         return (pad_sequence(examples, batch_first=True), None)
-    return (pad_sequence(examples, batch_first=True, padding_value=tokenizer.pad_token_id), None)
+    return (pad_sequence(examples, batch_first=True, padding_value=tok.pad_token_id), None)
 
 
 def voice_collate_fn(batch):

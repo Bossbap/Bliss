@@ -380,6 +380,20 @@ parser.add_argument(
     help="Turn off bi-directional RNNs, introduces lookahead convolution",
 )
 
+# --- Runtime checkpoint controls ---
+parser.add_argument(
+    "--checkpoint_interval",
+    type=int,
+    default=-1,
+    help="Save a deterministic checkpoint every N rounds (-1 disables checkpointing).",
+)
+parser.add_argument(
+    "--resume_from",
+    type=str,
+    default="",
+    help="Path to a checkpoint directory to resume from (empty string starts fresh).",
+)
+
 args, unknown = parser.parse_known_args()
 args.use_cuda = eval(args.use_cuda)
 

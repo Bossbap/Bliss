@@ -22,22 +22,24 @@ class ClientManager:
 
         if self.mode == 'oort':
             from thirdparty.oort.oort import create_training_selector
-            self.ucb_sampler = create_training_selector(args=args)
+            self.ucb_sampler = create_training_selector(args=args, sample_seed=sample_seed)
 
         if self.mode == 'pyramidfl':
             from thirdparty.oort.oort import create_pyramid_training_selector
-            self.pyr_sampler = create_pyramid_training_selector(args=args)
+            self.pyr_sampler = create_pyramid_training_selector(args=args, sample_seed=sample_seed)
             self._pyr_overrides: Dict[int, Dict[str, float | int]] = {}
             self._round_start_time: float = 0.0
 
         if self.mode == 'bliss':
             from thirdparty.bliss.bliss import create_training_selector
-            self.bliss_sampler = create_training_selector(args=args)
+            self.bliss_sampler = create_training_selector(args=args, sample_seed=sample_seed)
 
 
         self.feasibleClients = []
         self.rng = Random()
         self.rng.seed(sample_seed)
+        self._np_rng = np.random.default_rng(sample_seed)
+        self._client_seed_base = int(sample_seed) % (2**32)
         self.count = 0
         self.feasible_samples = 0
         self.args = args
@@ -57,6 +59,8 @@ class ClientManager:
             "availability": (35.0, 100.0),
             "batteryLevel": (-1.0, 99.0),
         }
+
+        self._last_online_log_clock: Optional[float] = None
 
     def register_client(self, host_id: int, client_id: int, size: int) -> None:
         """Register client information to the client manager.
@@ -78,6 +82,8 @@ class ClientManager:
             base_cd  = self.clients[base_key]
             cd = self._synthesise_client(base_cd, client_id)
             
+        client_seed = (self._client_seed_base + int(client_id)) % (2 ** 32)
+
         self.client_metadata[client_id] = ClientMetadata(
             host_id=host_id,
             client_id=client_id,
@@ -92,6 +98,7 @@ class ClientManager:
             active=cd['active'],
             inactive=cd['inactive'],
             peak_throughput=cd['peak_throughput'],
+            rng_seed=client_seed,
         )
 
         # Admit client iff size is within bounds
@@ -321,9 +328,15 @@ class ClientManager:
 
     def getOnlineClients(self, cur_time):
         clients_online = [client_id for client_id in self.feasibleClients if self.client_metadata[client_id].is_active(cur_time)]
-
-        logging.info(f"Wall clock time: {round(cur_time)}, {len(clients_online)} clients online, " +
-                     f"{len(self.feasibleClients) - len(clients_online)} clients offline")
+        if (
+            self._last_online_log_clock is None
+            or abs(cur_time - self._last_online_log_clock) > 1e-6
+        ):
+            logging.info(
+                f"Wall clock time: {round(cur_time)}, {len(clients_online)} clients online, "
+                f"{len(self.feasibleClients) - len(clients_online)} clients offline"
+            )
+            self._last_online_log_clock = cur_time
 
         return clients_online
 
@@ -553,6 +566,9 @@ class ClientManager:
     def getAllMetrics(self):
         if self.mode == "oort":
             return self.ucb_sampler.getAllMetrics()
+        elif self.mode == "pyramidfl":
+            # Expose PyramidFL internal metrics (same structure as Oort's totalArms)
+            return self.pyr_sampler.getAllMetrics()
         elif self.mode == "bliss":
             return self.bliss_sampler.getAllMetrics()
 
@@ -568,7 +584,7 @@ class ClientManager:
     def _trunc_gauss(self, sigma: float) -> float:
         """Sample ε ~ N(0, σ) truncated to [-1, 1]."""
         while True:
-            eps = np.random.normal(loc=0.0, scale=sigma)
+            eps = self._np_rng.normal(loc=0.0, scale=sigma)
             if self._noise_lo <= eps <= self._noise_hi:
                 return float(eps)
 
@@ -693,3 +709,71 @@ class ClientManager:
         if self.mode == "pyramidfl" and hasattr(self, "pyr_sampler"):
             return self.pyr_sampler.get_pacer_state()
         return {"algo": self.mode, "note": "no pacer state"}
+
+    # Determinism diagnostics: expose sampler RNG heads
+    # ------------------------------------------------------------------
+    #  Serialisation helpers
+    # ------------------------------------------------------------------
+    def get_state(self) -> dict:
+        """Return a serialisable snapshot of the ClientManager state."""
+        if self.mode == "oort" and self.ucb_sampler is not None:
+            sampler_state = self.ucb_sampler.get_state()
+        elif self.mode == "pyramidfl":
+            sampler_state = self.pyr_sampler.get_state()
+        elif self.mode == "bliss":
+            sampler_state = self.bliss_sampler.get_state()
+        else:
+            sampler_state = None
+
+        metadata_state = {
+            cid: meta.state_dict() for cid, meta in self.client_metadata.items()
+        }
+
+        return {
+            "mode": self.mode,
+            "rng_state": self.rng.getstate(),
+            "np_rng_state": self._np_rng.bit_generator.state,
+            "feasibleClients": list(self.feasibleClients),
+            "feasible_samples": self.feasible_samples,
+            "count": self.count,
+            "client_metadata": metadata_state,
+            "sampler_state": sampler_state,
+            "_pyr_overrides": getattr(self, "_pyr_overrides", {}),
+            "_round_start_time": getattr(self, "_round_start_time", 0.0),
+        }
+
+    def load_state(self, state: dict) -> None:
+        """Restore ClientManager state from `get_state` output."""
+        if not state:
+            return
+
+        rng_state = state.get("rng_state")
+        if rng_state is not None:
+            self.rng.setstate(rng_state)
+        np_state = state.get("np_rng_state")
+        if np_state is not None:
+            self._np_rng = np.random.default_rng()
+            self._np_rng.bit_generator.state = np_state
+
+        self.feasibleClients = list(state.get("feasibleClients", []))
+        self.feasible_samples = state.get("feasible_samples", self.feasible_samples)
+        self.count = state.get("count", self.count)
+
+        self.client_metadata = {}
+        meta_blob = state.get("client_metadata", {})
+        for cid, mstate in meta_blob.items():
+            cm = ClientMetadata.from_state(mstate)
+            self.client_metadata[int(cid)] = cm
+
+        sampler_state = state.get("sampler_state")
+        if sampler_state:
+            if self.mode == "oort" and self.ucb_sampler is not None:
+                self.ucb_sampler.load_state(sampler_state)
+            elif self.mode == "pyramidfl":
+                self.pyr_sampler.load_state(sampler_state)
+            elif self.mode == "bliss":
+                self.bliss_sampler.load_state(sampler_state)
+
+        if self.mode == "pyramidfl":
+            self._pyr_overrides = state.get("_pyr_overrides", {})
+            self._round_start_time = state.get("_round_start_time", 0.0)

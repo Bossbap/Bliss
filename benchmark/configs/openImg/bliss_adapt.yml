@@ -2,18 +2,19 @@
 
 # ========== Cluster configuration ========== 
 # ip address of the parameter server (need 1 GPU process)
-ps_ip: 129.104.253.51
+ps_ip: 129.104.252.32
 
 # ip address of each worker:# of available gpus process on each gpu in this node
 # Note that if we collocate ps and worker on same GPU, then we need to decrease this number of available processes on that GPU by 1
 # E.g., master node has 4 available processes, then 1 for the ps, and worker should be set to: worker:3
-worker_ips: 
-    - 129.104.253.51:[3]
-    - 129.104.253.44:[4]
-    - 129.104.252.50:[4]
-    - 129.104.252.56:[4]
-    - 129.104.252.38:[4]
-
+worker_ips:
+    - 129.104.252.32:[3]
+    - 129.104.252.34:[4]
+    - 129.104.252.39:[4]
+    - 129.104.252.43:[4]
+    - 129.104.252.45:[4]
+    - 129.104.252.49:[4]
+    - 129.104.252.54:[4]
 
 exp_path: /users/eleves-a/2024/baptiste.geisenberger/FedScale/fedscale/cloud
 
@@ -36,42 +37,47 @@ setup_commands:
 
 job_conf:
     # - wandb_token: c5a1a0bea7a1022889068d96b579c791dc52420e
-    - job_name: google_speech                   # Generate logs under this folder: log_path/job_name/time_stamp
-    - num_classes: 35
-    - task: speech
+    - job_name: openimage                   # Generate logs under this folder: log_path/job_name/time_stamp
+    - num_classes: 596
+    - task: cv
     - log_path: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark # Path of log files
-    - data_set: google_speech                     # Dataset: openImg, google_speech, stackoverflow
-    - data_dir: /Data/baptiste.geisenberger/Data/google_speech    # Path of the dataset
-    - data_map_file: /Data/baptiste.geisenberger/Data/google_speech/client_data_mapping/train.csv              # Allocation of data to each client, turn to iid setting if not provided
+    - data_set: openImg                     # Dataset: openImg, google_speech, stackoverflow
+    - data_dir: /Data/baptiste.geisenberger/Data/openImg    # Path of the dataset
+    - data_map_file: /Data/baptiste.geisenberger/Data/openImg/client_data_mapping/train.csv              # Allocation of data to each client, turn to iid setting if not provided
     - clients_file: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark/dataset/data/clients.pkl
     - use_cuda: True
     - num_loaders: 2
     - clock_factor: 30
+    - checkpoint_interval: 50
+    - resume_from: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark/logs/openimage/1024_180206/checkpoints
 
-    - model: resnet34                            # Models: e.g., shufflenet_v2_x2_0, mobilenet_v2, resnet34, albert-base-v2
+    - model: shufflenet_v2_x2_0                 # Models: e.g., shufflenet_v2_x2_0, mobilenet_v2, resnet34, albert-base-v2
     - gradient_policy: fed-prox                 # {"fed-yogi", "fed-prox", "fed-avg"}, "fed-avg" by default
-    - proxy_mu: 0.001
 
     - num_participants: 100                      # Number of participants per round, we use K=100 in our paper, large K will be much slower
-    - eval_interval: 5                     # How many rounds to run a testing on the testing set
+    - eval_interval: 5                            # How many rounds to run a testing on the testing set
     - rounds: 500                          # Number of rounds to run this training. We use 1000 in our paper, while it may converge w/ ~400 rounds
-    - batch_size: 16
-    - filter_less: 17
+    - local_steps: 20
+    - batch_size: 32
+    - filter_less: 32
     - learning_rate: 0.02
-    - decay_factor: 0.9
+    - decay_factor: 0.98
     - decay_round: 10
-    - weight_decay: 8e-5
+    - weight_decay: 4e-5
     - test_bsz: 20
-    
+    - overcomitmment: 1.1
+
     - sample_mode: bliss
     - number_clients_to_refresh_utility: 500
     - number_clients_to_predict_utility: 500
     - amount_clients_predict_train_set: 1000
     - amount_clients_refresh_train_set: 1500
     - ema_alpha: 0.9
-    - overcomitmment: 1.3
 
-    - adaptive_training: False
+    - adaptive_training: true
+    - t_budget: 120
+    - pacer_step: 10
+    - pacer_delta: 50
 
     - g_model: xgboost
     - xgboost_g_n_estimators: 200

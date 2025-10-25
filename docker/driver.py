@@ -6,6 +6,7 @@ import pickle
 import random
 import shlex
 import subprocess
+import shlex
 import sys
 import time
 import json
@@ -107,6 +108,8 @@ def process_cmd(yaml_file, local=False):
 
     # =========== Submit job to parameter server ============
     running_vms.add(ps_ip)
+    detdebug_val = os.environ.get("FEDSCALE_DETDEBUG", "")
+
     if use_container == "docker":
         # store ip, port of each container
         ctnr_dict = dict()
@@ -117,10 +120,20 @@ def process_cmd(yaml_file, local=False):
             "port": ports[0]
         }
         print(f"Starting aggregator container {ps_name} on {ps_ip}...")
-        ps_cmd = f" docker run -i --name {ps_name} --network {yaml_conf['container_network']} -p {ports[0]}:30000 --mount type=bind,source={yaml_conf['data_path']},target=/FedScale/benchmark fedscale/fedscale-aggr"
+        env_opt = f" -e FEDSCALE_DETDEBUG={shlex.quote(detdebug_val)}" if detdebug_val else ""
+        ps_cmd = (
+            f" docker run -i --name {ps_name} --network {yaml_conf['container_network']}"
+            f" -p {ports[0]}:30000{env_opt}"
+            f" --mount type=bind,source={yaml_conf['data_path']},target=/FedScale/benchmark"
+            f" fedscale/fedscale-aggr"
+        )
     else:
         print(f"Starting aggregator on {ps_ip}...")
-        ps_cmd = f" python {yaml_conf['exp_path']}/{yaml_conf['aggregator_entry']} {conf_script} --this_rank=0 --num_executors={total_gpu_processes} --executor_configs={executor_configs} "
+        env_prefix = f"FEDSCALE_DETDEBUG={shlex.quote(detdebug_val)} " if detdebug_val else ""
+        ps_cmd = (
+            f" {env_prefix}python {yaml_conf['exp_path']}/{yaml_conf['aggregator_entry']} {conf_script}"
+            f" --this_rank=0 --num_executors={total_gpu_processes} --executor_configs={executor_configs} "
+        )
 
     with open(f"{job_name}_logging", 'wb') as fout:
         pass
@@ -156,9 +169,19 @@ def process_cmd(yaml_file, local=False):
                         "cuda_id": cuda_id
                     }
 
-                    worker_cmd = f" docker run -i --name fedscale-exec{rank_id}-{time_stamp} --network {yaml_conf['container_network']} -p {ports[rank_id]}:32000 --mount type=bind,source={yaml_conf['data_path']},target=/FedScale/benchmark fedscale/fedscale-exec"
+                    env_opt = f" -e FEDSCALE_DETDEBUG={shlex.quote(detdebug_val)}" if detdebug_val else ""
+                    worker_cmd = (
+                        f" docker run -i --name fedscale-exec{rank_id}-{time_stamp} --network {yaml_conf['container_network']}"
+                        f" -p {ports[rank_id]}:32000{env_opt}"
+                        f" --mount type=bind,source={yaml_conf['data_path']},target=/FedScale/benchmark"
+                        f" fedscale/fedscale-exec"
+                    )
                 else:
-                    worker_cmd = f" python {yaml_conf['exp_path']}/{yaml_conf['executor_entry']} {conf_script} --this_rank={rank_id} --num_executors={total_gpu_processes} --cuda_device=cuda:{cuda_id} "
+                    env_prefix = f"FEDSCALE_DETDEBUG={shlex.quote(detdebug_val)} " if detdebug_val else ""
+                    worker_cmd = (
+                        f" {env_prefix}python {yaml_conf['exp_path']}/{yaml_conf['executor_entry']} {conf_script}"
+                        f" --this_rank={rank_id} --num_executors={total_gpu_processes} --cuda_device=cuda:{cuda_id} "
+                    )
                 rank_id += 1
 
                 with open(f"{job_name}_logging", 'a') as fout:

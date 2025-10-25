@@ -106,3 +106,20 @@ class TorchServerOptimizer(object):
         else:
             # The default optimizer, FedAvg, has been applied in aggregator.py on the fly
             pass
+
+    def state_dict(self):
+        if self.mode == "fed-yogi" and hasattr(self, "gradient_controller"):
+            return {
+                "mode": self.mode,
+                "controller": self.gradient_controller.state_dict(),
+            }
+        return {"mode": self.mode}
+
+    def load_state_dict(self, state):
+        if not state:
+            return
+        mode = state.get("mode")
+        if mode != self.mode:
+            return
+        if self.mode == "fed-yogi" and hasattr(self, "gradient_controller"):
+            self.gradient_controller.load_state_dict(state.get("controller"))

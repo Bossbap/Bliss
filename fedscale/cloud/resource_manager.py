@@ -38,8 +38,7 @@ class ResourceManager(object):
         # TODO: always has next task
         exist_next_task = False
         if self.experiment_mode == commons.SIMULATION_MODE:
-            exist_next_task = self.client_run_queue_idx < len(
-                self.client_run_queue)
+            exist_next_task = self.client_run_queue_idx < len(self.client_run_queue)
         else:
             exist_next_task = client_id in self.client_run_queue
         return exist_next_task

@@ -12,9 +12,10 @@ shape of the algorithm.  Drop‑in replacement with more sophisticated models is
 straight‑forward – just plug them behind the same method signatures.
 """
 
+import copy
 import logging
 import random
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 import pprint
 from datetime import datetime
 from pathlib import Path
@@ -32,9 +33,10 @@ from .regressor import Regressor
 # Public factory helpers – FedScale expects these names
 # -----------------------------------------------------------------------------
 
-def create_training_selector(args):
+def create_training_selector(args, sample_seed: Optional[int] = None):
     """Factory used by `ClientManager` during training‑time sampling."""
-    return _training_selector(args)
+    seed = sample_seed if sample_seed is not None else getattr(args, "sample_seed", 233)
+    return _training_selector(args, sample_seed=seed)
 
 # -----------------------------------------------------------------------------
 # Training selector – core of Bliss
@@ -99,6 +101,78 @@ class _training_selector:
     # ------------------------------------------------------------------
     # Interface called by ClientManager / Aggregator
     # ------------------------------------------------------------------
+    def get_state(self) -> Dict[str, Any]:
+        """Return a serialisable snapshot of the selector."""
+        return {
+            "clients": copy.deepcopy(self.clients),
+            "round": self.round,
+            "rng_state": self.rng.getstate(),
+            "np_random_state": np.random.get_state(),
+            "number_clients_to_predict_utility": self.number_clients_to_predict_utility,
+            "number_clients_to_refresh_utility": self.number_clients_to_refresh_utility,
+            "amount_clients_refresh_train_set": self.amount_clients_refresh_train_set,
+            "amount_clients_predict_train_set": self.amount_clients_predict_train_set,
+            "ema_alpha": self.ema_alpha,
+            "clients_to_predict": list(self.clients_to_predict),
+            "clients_to_refresh": list(self.clients_to_refresh),
+            "collect_data": self.collect_data,
+            "exploitUtilHistory": list(self.exploitUtilHistory),
+            "exploitClients": list(self.exploitClients),
+            "successfulClients": list(self.successfulClients),
+            "t_budget": self.t_budget,
+            "pacer_step": self.pacer_step,
+            "pacer_delta": self.pacer_delta,
+            "g_model": self.g_model.state_dict(),
+            "h_model": self.h_model.state_dict(),
+            "_last_pred_seen": copy.deepcopy(self._last_pred_seen),
+            "_last_pred_unseen": copy.deepcopy(self._last_pred_unseen),
+            "_h_tally": getattr(self, "_h_tally", None),
+        }
+
+    def load_state(self, state: Optional[Dict[str, Any]]) -> None:
+        """Restore selector state from `get_state` output."""
+        if not state:
+            return
+
+        self.clients = copy.deepcopy(state.get("clients", {}))
+        self.round = int(state.get("round", self.round))
+        rng_state = state.get("rng_state")
+        if rng_state is not None:
+            self.rng.setstate(rng_state)
+        np_state = state.get("np_random_state")
+        if np_state is not None:
+            np.random.set_state(np_state)
+
+        self.number_clients_to_predict_utility = state.get(
+            "number_clients_to_predict_utility", self.number_clients_to_predict_utility
+        )
+        self.number_clients_to_refresh_utility = state.get(
+            "number_clients_to_refresh_utility", self.number_clients_to_refresh_utility
+        )
+        self.amount_clients_refresh_train_set = state.get(
+            "amount_clients_refresh_train_set", self.amount_clients_refresh_train_set
+        )
+        self.amount_clients_predict_train_set = state.get(
+            "amount_clients_predict_train_set", self.amount_clients_predict_train_set
+        )
+        self.ema_alpha = state.get("ema_alpha", self.ema_alpha)
+        self.clients_to_predict = list(state.get("clients_to_predict", []))
+        self.clients_to_refresh = list(state.get("clients_to_refresh", []))
+        self.collect_data = state.get("collect_data", self.collect_data)
+        self.exploitUtilHistory = list(state.get("exploitUtilHistory", []))
+        self.exploitClients = list(state.get("exploitClients", []))
+        self.successfulClients = set(state.get("successfulClients", []))
+        self.t_budget = state.get("t_budget", self.t_budget)
+        self.pacer_step = state.get("pacer_step", self.pacer_step)
+        self.pacer_delta = state.get("pacer_delta", self.pacer_delta)
+
+        self.g_model.load_state_dict(state.get("g_model"))
+        self.h_model.load_state_dict(state.get("h_model"))
+
+        self._last_pred_seen = copy.deepcopy(state.get("_last_pred_seen", {}))
+        self._last_pred_unseen = copy.deepcopy(state.get("_last_pred_unseen", {}))
+        if "_h_tally" in state and state["_h_tally"] is not None:
+            self._h_tally = dict(state["_h_tally"])
 
     def register_client(self, client_id: int, feedbacks: Dict[str, Any]):
         """Add a new client to the system (initially considered *unseen*)."""

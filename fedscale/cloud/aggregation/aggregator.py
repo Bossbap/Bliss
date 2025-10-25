@@ -8,6 +8,7 @@ import random
 import threading
 import time
 from concurrent import futures
+import logging
 import types
 
 import grpc
@@ -90,6 +91,19 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         if self._resume_client_manager_state:
             self.client_manager.load_state(self._resume_client_manager_state)
+            # keep aggregator args aligned with selector pacing state
+            if self.client_manager.mode in ("oort", "pyramidfl"):
+                sampler = getattr(
+                    self.client_manager,
+                    "pyr_sampler" if self.client_manager.mode == "pyramidfl" else "ucb_sampler",
+                    None,
+                )
+                if sampler is not None and hasattr(sampler, "t_budget"):
+                    self.args.t_budget = float(sampler.t_budget)
+            elif self.client_manager.mode == "bliss":
+                sampler = getattr(self.client_manager, "bliss_sampler", None)
+                if sampler is not None and hasattr(sampler, "t_budget"):
+                    self.args.t_budget = float(sampler.t_budget)
 
         if not self._checkpoint_dir:
             base_log_path = os.path.abspath(self.args.log_path)
@@ -149,7 +163,6 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         # PyramidFL per-client (t_comp, t_total) cache for the current round
         self._pyramid_times = {}
-        self._round_update_cache = {}
 
         # number of registered executors
         self.registered_executor_info = set()
@@ -207,6 +220,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         self._pre_util_map = {}              # {cid: util_before} for oort/pyramidfl
         self._client_round_utils = {}        # {cid: util_after}
         self._client_time_breakdown = {}     # {cid: {t_dl,t_comp,t_ul,(iters|iters_p1|iters_p2|dropout_frac)}}
+        self._sampled_durations = {}
         self.completed_clients = []          # [cid]
         self.failed_clients = []             # [cid]
         self._bliss_pred_seen = {}           # {cid: pred_util}
@@ -365,6 +379,9 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             "bliss_pred_unseen": {int(k): float(v) for k, v in (self._bliss_pred_unseen or {}).items()},
             "round_begin_payload": copy.deepcopy(self._round_begin_payload),
         }
+        # include per-sampled durations for Oort/PyramidFL to restore selector state precisely
+        if hasattr(self, "_sampled_durations") and self._sampled_durations:
+            plan["sampled_durations"] = copy.deepcopy(self._sampled_durations)
         return plan
 
     def _apply_round_plan(self, plan: dict):
@@ -399,7 +416,25 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             self._log_json("ROUND_BEGIN", self._round_begin_payload)
 
         clients_to_run = list(plan.get("clients_to_run", []))
-        self.resource_manager.register_tasks(clients_to_run)
+
+        # Ensure selector sees the same per-client durations as in continuous run
+        try:
+            if self.client_manager.mode in ("oort", "pyramidfl"):
+                # First: durations as used for top-K/stragglers
+                if self.virtual_client_clock:
+                    for cid, dur in self.virtual_client_clock.items():
+                        self.client_manager.registerDuration(int(cid), float(dur))
+                # Then: durations for all sampled clients captured during planning
+                sd = plan.get("sampled_durations", {}) or {}
+                if sd:
+                    for cid_s, dur in sd.items():
+                        self.client_manager.registerDuration(int(cid_s), float(dur))
+                    # Log head of restored durations
+                    head = sorted([(int(k), float(v)) for k, v in sd.items()])[:20]
+                    logging.info("[RESUME_DURATIONS_HEAD] size=%d head=%s", len(sd), head)
+        except Exception:
+            logging.exception("[resume] failed to register per-client durations into selector")
+        # Defer task assignment to dispatch time (we need executor set)
         return clients_to_run
 
     def _checkpoint_payload(self, plan: dict) -> dict:
@@ -580,7 +615,8 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         if self._resume_model_weights is not None:
             try:
-                self.model_wrapper.set_weights(self._resume_model_weights, is_aggregator=True)
+                # Restore weights verbatim; avoid applying server optimizer here
+                self.model_wrapper.set_weights(self._resume_model_weights, is_aggregator=False)
                 self.model_weights = self.model_wrapper.get_weights()
                 logging.info("Restored model weights from checkpoint.")
             except Exception:
@@ -808,6 +844,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         sampledClientsReal = []
         completionTimes = []
         completed_client_clock = {}
+        sampled_durations = {}
 
         for client_to_run in sampled_clients:
             # Default args
@@ -848,6 +885,8 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
             if self.client_manager.mode in ("oort", "pyramidfl"):
                 self.client_manager.registerDuration(client_to_run, duration=roundDuration)
+            # record duration for all sampled clients (active or not)
+            sampled_durations[int(client_to_run)] = float(roundDuration)
 
             if self.client_manager.isClientActiveThroughout(
                 client_to_run,
@@ -876,6 +915,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             completed_client_clock,
             round_duration,
             [completionTimes[k] for k in top_k_index],
+            sampled_durations,
         )
 
     # ----------------------------------------------------------------------
@@ -975,75 +1015,42 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         """
 
         upd = results["update_weight"]
-        client_id = results.get("client_id")
-        try:
-            client_id = int(client_id)
-        except Exception:
-            client_id = len(self._round_update_cache)
-
         if self._is_first_result_in_round():
             if isinstance(upd, dict):
                 self.param_order = list(upd.keys())
+                self.model_weights = {
+                    k: v.copy() if hasattr(v, "copy") else copy.deepcopy(v)
+                    for k, v in upd.items()
+                }
             else:
                 self.param_order = list(range(len(upd)))
-            self._round_update_cache = {}
+                self.model_weights = [
+                    w.copy() if hasattr(w, "copy") else copy.deepcopy(w) for w in upd
+                ]
+            return
 
         if isinstance(upd, dict):
-            self._round_update_cache[client_id] = {
-                k: v.copy() if hasattr(v, "copy") else v for k, v in upd.items()
-            }
+            for k, v in upd.items():
+                self.model_weights[k] += v
         else:
-            self._round_update_cache[client_id] = [
-                w.copy() if hasattr(w, "copy") else w for w in upd
-            ]
+            for idx, v in enumerate(upd):
+                self.model_weights[idx] += v
 
         if not self._is_last_result_in_round():
             return
 
         denom = float(self.tasks_round) if self.tasks_round else 1.0
-        ordered_ids = sorted(self._round_update_cache.keys())
-        if not ordered_ids:
-            return
 
-        first_update = self._round_update_cache[ordered_ids[0]]
-
-        if isinstance(first_update, dict):
-            sum_weights = {
-                k: np.zeros_like(first_update[k]) for k in self.param_order
-            }
-            for cid in ordered_ids:
-                upd_dict = self._round_update_cache[cid]
-                for k in self.param_order:
-                    sum_weights[k] += upd_dict[k]
-
+        if isinstance(self.model_weights, dict):
             to_send = []
             for k in self.param_order:
-                avg = sum_weights[k] / denom
-                if isinstance(avg, np.ndarray) and np.issubdtype(avg.dtype, np.integer):
-                    avg = avg.astype(np.float32)
-                sum_weights[k] = avg
-                to_send.append(avg)
-            self.model_weights = sum_weights
+                v = self.model_weights[k]
+                if np.issubdtype(v.dtype, np.integer):
+                    v = v.astype(np.float32)
+                self.model_weights[k] = v / denom
+                to_send.append(self.model_weights[k])
         else:
-            num_params = len(first_update)
-            sum_weights = [
-                np.zeros_like(first_update[i]) for i in range(num_params)
-            ]
-            for cid in ordered_ids:
-                upd_list = self._round_update_cache[cid]
-                for idx in range(num_params):
-                    sum_weights[idx] += upd_list[idx]
-
-            avg_list = []
-            for arr in sum_weights:
-                avg = arr / denom
-                if isinstance(avg, np.ndarray) and np.issubdtype(avg.dtype, np.integer):
-                    avg = avg.astype(np.float32)
-                avg_list.append(avg)
-            self.model_weights = avg_list
-            to_send = avg_list
-
-        self._round_update_cache = {}
+            to_send = [w / denom for w in self.model_weights]
 
         if self.args.gradient_policy in ["q-fedavg"]:
             self.client_training_results.sort(
@@ -1139,7 +1146,6 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             logging.info("Bootstrap: BEGINNING of round %d", self.round)
 
             resumed_plan = False
-            plan_to_save = None
 
             if has_resume_plan:
                 plan = copy.deepcopy(self._resume_plan)
@@ -1147,7 +1153,6 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                 clients_to_run = self._apply_round_plan(plan)
                 round_stragglers = list(plan.get("round_stragglers", []))
                 resumed_plan = True
-                plan_to_save = copy.deepcopy(plan)
             else:
                 online_clients = self.client_manager.getOnlineClients(self.global_virtual_clock)
 
@@ -1171,6 +1176,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                         virtual_client_clock,
                         round_duration,
                         flatten_client_duration,
+                        sampled_durations,
                     ) = self.tictak_client_tasks(
                         self.sampled_participants, self.args.num_participants
                     )
@@ -1179,6 +1185,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                     self.flatten_client_duration = np.array(flatten_client_duration)
                     self.round_duration = round_duration
                     self.round_stragglers = round_stragglers
+                    self._sampled_durations = sampled_durations
 
                     # Build per-client non-adaptive time breakdown (download/compute/upload)
                     self._client_time_breakdown = {}
@@ -1256,14 +1263,18 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                     "pacer": self.client_manager.get_pacer_state(),
                 }
                 self._log_json("ROUND_BEGIN", self._round_begin_payload)
-                plan_to_save = self._collect_current_plan(clients_to_run, self.round_stragglers)
 
-            if plan_to_save is None:
-                plan_to_save = self._collect_current_plan(clients_to_run, self.round_stragglers)
-            self._maybe_checkpoint(plan_to_save)
+            # Ensure selector sees identical sampled durations as in the original planning
+            try:
+                if has_resume_plan and self.client_manager.mode in ("oort", "pyramidfl"):
+                    # durations for all sampled participants were captured in plan
+                    sd = plan.get("sampled_durations", {}) or {}
+                    for cid_s, dur in sd.items():
+                        self.client_manager.registerDuration(int(cid_s), float(dur))
+            except Exception:
+                logging.exception("[resume] failed to register sampled durations into selector")
 
-            if not resumed_plan:
-                self.resource_manager.register_tasks(clients_to_run)
+            self.resource_manager.register_tasks(clients_to_run)
 
             if self.experiment_mode == commons.SIMULATION_MODE:
                 self.sampled_executors = list(self.individual_client_events.keys())
@@ -1275,6 +1286,12 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             self.stats_util_accumulator = []
             self.client_training_results = []
             self.loss_accumulator = []
+
+            logging.info(
+                "Selected %d participants to run: %s",
+                len(clients_to_run),
+                clients_to_run,
+            )
 
             # Start round
             self.broadcast_aggregator_events(commons.UPDATE_MODEL)
@@ -1427,6 +1444,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         # ======= Now select and dispatch the *next* round =======
         self._pyramid_times = {}
+
         self.sampled_participants = self.select_participants(
             select_num_participants=self.args.num_participants,
             overcommitment=self.args.overcommitment,
@@ -1447,6 +1465,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                 virtual_client_clock,
                 round_duration,
                 flatten_client_duration,
+                sampled_durations,
             ) = self.tictak_client_tasks(
                 self.sampled_participants, self.args.num_participants
             )
@@ -1456,44 +1475,9 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             self.flatten_client_duration = np.array(flatten_client_duration)
             self.round_duration = round_duration
             self.round_stragglers = round_stragglers
+            self._sampled_durations = sampled_durations
+            # Do not re-simulate per-client breakdown here to preserve RNG determinism
             self._client_time_breakdown = {}
-
-            def _fill_breakdown_next(cid: int):
-                meta = self.client_manager.getClient(cid)
-                drop_p = 0.0
-                local_steps = getattr(self.args, "local_steps", 0)
-                if self.client_manager.mode == "pyramidfl":
-                    ov = self.client_manager.get_pyramidfl_conf(cid) or {}
-                    drop_p = float(ov.get("dropout_p", 0.0) or 0.0)
-                    local_steps = int(ov.get("local_steps", local_steps))
-                t_dl = meta.get_download_time(
-                    cur_time=self.global_virtual_clock,
-                    model_size_mb=self.model_size,
-                    clock_factor=self.args.clock_factor,
-                )
-                t_comp, t_total = meta.get_times_with_dropout(
-                    cur_time=self.global_virtual_clock,
-                    batch_size=self.args.batch_size,
-                    local_steps=local_steps if local_steps else self.args.local_steps,
-                    model_size=self.model_size,
-                    model_amount_parameters=self.model_amount_parameters,
-                    reduction_factor=0.5,
-                    dropout_p=drop_p,
-                    clock_factor=self.args.clock_factor,
-                )
-                t_ul = max(0.0, t_total - t_dl - t_comp)
-                self._client_time_breakdown[int(cid)] = {
-                    "t_dl": float(t_dl),
-                    "t_comp": float(t_comp),
-                    "t_ul": float(t_ul),
-                    "iters": int(local_steps if local_steps else self.args.local_steps),
-                    "dropout_frac": float(drop_p),
-                }
-
-            for cid in clients_to_run:
-                _fill_breakdown_next(int(cid))
-            for cid in self.round_stragglers:
-                _fill_breakdown_next(int(cid))
 
         self._pre_util_map = {}
         if self.client_manager.mode in ("oort", "pyramidfl"):

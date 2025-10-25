@@ -28,7 +28,6 @@ fedscale/cloud/execution/adaptive_torch_client.py
 fedscale/cloud/execution/client_base.py
 fedscale/cloud/execution/data_processor.py
 fedscale/cloud/execution/executor.py
-fedscale/cloud/execution/optimizers.py
 fedscale/cloud/execution/rl_client.py
 fedscale/cloud/execution/tensorflow_client.py
 fedscale/cloud/execution/torch_client.py

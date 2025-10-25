@@ -2,7 +2,8 @@
 from __future__ import annotations
 import logging
 import importlib
-from typing import Any, Dict
+import pickle
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -49,6 +50,66 @@ class Regressor:
             )
             self._name = "linreg"
             self._init_linreg()
+
+    # ------------------------------------------------------------------ #
+    # serialization helpers                                             #
+    # ------------------------------------------------------------------ #
+    def state_dict(self) -> Dict[str, Any]:
+        """
+        Return a picklable snapshot of the regressor, including fitted weights.
+        """
+        state: Dict[str, Any] = {
+            "name": self._name,
+            "hyper": self._hyper,
+        }
+        model = getattr(self, "_model", None)
+        if model is None:
+            state["model"] = None
+            return state
+
+        if self._name == "xgboost":
+            try:
+                booster = model.get_booster()
+            except AttributeError as exc:
+                raise RuntimeError(
+                    "[Bliss] Cannot serialise XGBoost regressor; booster unavailable"
+                ) from exc
+            state["model_raw"] = booster.save_raw()
+        else:
+            state["model_pickle"] = pickle.dumps(model)
+        return state
+
+    def load_state_dict(self, state: Optional[Dict[str, Any]]) -> None:
+        """
+        Restore the regressor from a state previously produced by `state_dict`.
+        """
+        if not state:
+            return
+
+        name = state.get("name", self._name)
+        hyper = state.get("hyper", self._hyper)
+        self.__init__(name, hyper)
+
+        model = state.get("model")
+        if model is None:
+            return
+
+        if self._name == "xgboost":
+            raw = state.get("model_raw")
+            if raw is None:
+                return
+            try:
+                self._model.load_model(bytearray(raw))
+            except TypeError:
+                # Older xgboost expects BytesIO-like object
+                import io
+
+                buf = io.BytesIO(raw)
+                self._model.load_model(buf)
+        else:
+            blob = state.get("model_pickle")
+            if blob is not None:
+                self._model = pickle.loads(blob)
 
     # ------------------------------------------------------------------ #
     # public API                                                         #
