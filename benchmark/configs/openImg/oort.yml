@@ -2,17 +2,21 @@
 
 # ========== Cluster configuration ========== 
 # ip address of the parameter server (need 1 GPU process)
-ps_ip: 129.104.252.32
+ps_ip: 129.104.254.40
 
 # ip address of each worker:# of available gpus process on each gpu in this node
 # Note that if we collocate ps and worker on same GPU, then we need to decrease this number of available processes on that GPU by 1
 # E.g., master node has 4 available processes, then 1 for the ps, and worker should be set to: worker:3
 worker_ips:
-    - 129.104.252.32:[3]
-    - 129.104.252.34:[4]
-    - 129.104.252.45:[4]
-    - 129.104.252.49:[4]
-    - 129.104.252.53:[4]
+    - 129.104.254.32:[3]
+    - 129.104.254.33:[3]
+    - 129.104.254.34:[3]
+    - 129.104.254.35:[3]
+    - 129.104.254.36:[3]
+    - 129.104.254.37:[3]
+    - 129.104.254.38:[3]
+    - 129.104.254.39:[3]
+    - 129.104.254.40:[2]
 
 exp_path: /users/eleves-a/2024/baptiste.geisenberger/FedScale/fedscale/cloud
 
@@ -28,35 +32,33 @@ auth:
 # cmd to run before we can indeed run FAR (in order)
 setup_commands:
     - source /Data/baptiste.geisenberger/miniconda3/bin/activate fedscale
-#    - export NCCL_SOCKET_IFNAME='enp0s31f6'         # Run "ifconfig" to ensure the right NIC for nccl if you have multiple NICs
 
 # ========== Additional job configuration ========== 
 # Default parameters are specified in config_parser.py, wherein more description of the parameter can be found
 
 job_conf:
-    # - wandb_token: c5a1a0bea7a1022889068d96b579c791dc52420e
-    - job_name: openimage                   # Generate logs under this folder: log_path/job_name/time_stamp
+    - job_name: openimage_oort
     - num_classes: 596
     - task: cv
-    - log_path: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark # Path of log files
-    - data_set: openImg                     # Dataset: openImg, google_speech, stackoverflow
-    - data_dir: /Data/baptiste.geisenberger/Data/openImg    # Path of the dataset
-    - data_map_file: /Data/baptiste.geisenberger/Data/openImg/client_data_mapping/train.csv              # Allocation of data to each client, turn to iid setting if not provided
+    - log_path: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark
+    - data_set: openImg
+    - data_dir: /Data/baptiste.geisenberger/Data/openImg
+    - data_map_file: /Data/baptiste.geisenberger/Data/openImg/client_data_mapping/train.csv
     - clients_file: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark/dataset/data/clients.pkl
     - use_cuda: True
-    - num_loaders: 0
+    - num_loaders: 2
     - clock_factor: 30
-    - checkpoint_interval: 5
-    # - resume_from: /users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark/logs/google_speech/1021_110646/checkpoints
+    - checkpoint_interval: 30
+    # - resume_from: "/users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark/logs/openimage/ /checkpoints"
 
-    - model: shufflenet_v2_x2_0                 # Models: e.g., shufflenet_v2_x2_0, mobilenet_v2, resnet34, albert-base-v2
+    - model: shufflenet_v2_x2_0
     - openimg_size: 256
-    - gradient_policy: fed-prox                 # {"fed-yogi", "fed-prox", "fed-avg"}, "fed-avg" by default
+    - gradient_policy: fed-prox
     - proxy_mu: 0.001
 
-    - num_participants: 100                      # Number of participants per round, we use K=100 in our paper, large K will be much slower
-    - eval_interval: 5                            # How many rounds to run a testing on the testing set
-    - rounds: 500                          # Number of rounds to run this training. We use 1000 in our paper, while it may converge w/ ~400 rounds
+    - num_participants: 100
+    - eval_interval: 5
+    - rounds: 500
     - local_steps: 20
     - batch_size: 20
     - filter_less: 20
@@ -66,10 +68,10 @@ job_conf:
     - weight_decay: 4e-5
     - test_bsz: 20
     - overcommitment: 1.3
-    
+
     - sample_mode: oort
-    - pacer_delta: 10
     - pacer_step: 20
+    - pacer_delta: 10
     - exploration_factor: 0.9
     - exploration_decay: 0.98
     - exploration_min: 0.2

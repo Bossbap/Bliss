@@ -1,0 +1,107 @@
+2025-10-31 19:06:00.629847: I tensorflow/core/util/port.cc:111] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2025-10-31 19:06:00.647169: E tensorflow/compiler/xla/stream_executor/cuda/cuda_dnn.cc:9342] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+2025-10-31 19:06:00.647184: E tensorflow/compiler/xla/stream_executor/cuda/cuda_fft.cc:609] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+2025-10-31 19:06:00.647188: E tensorflow/compiler/xla/stream_executor/cuda/cuda_blas.cc:1518] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+2025-10-31 19:06:00.650076: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE4.1 SSE4.2 AVX AVX2 AVX_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+(10-31) 19:06:01 INFO     [aggregator.py:78] Job args Namespace(job_name='openimage_centralized', log_path='/users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark', wandb_token='', ps_ip='129.104.252.56', ps_port='29500', this_rank=0, connection_timeout=60, experiment_mode='simulation', engine='pytorch', num_executors=1, executor_configs='129.104.252.56:[1]', num_participants=1, data_map_file='/Data/baptiste.geisenberger/Data/openImg/centralized_mapping/train.csv', use_cuda=True, cuda_device=None, time_stamp='1031_190557', task='cv', clients_file='/users/eleves-a/2024/baptiste.geisenberger/FedScale/benchmark/dataset/data/clients.pkl', clock_factor=0, model_zoo='torchcv', data_dir='/Data/baptiste.geisenberger/Data/openImg', device_conf_file='/tmp/client.cfg', model='shufflenet_v2_x2_0', data_set='openImg', sample_mode='random', filter_less=20, filter_more=1000000000000000.0, train_uniform=False, conf_path='~/dataset/', overcommitment=1.0, model_size=65536, clip_bound=0.9, blacklist_rounds=-1, blacklist_max_len=0.3, embedding_file='glove.840B.300d.txt', input_shape=[1, 3, 28, 28], rounds=90, local_steps=4802, batch_size=256, test_bsz=256, backend='gloo', learning_rate=0.1, min_learning_rate='1e-5', input_dim=0, output_dim=0, dump_epoch=10000000000.0, decay_factor=0.1, decay_round=30, num_loaders=2, eval_interval=5, sample_seed=233, test_ratio=1.0, loss_decay=0.2, exploration_min=0.3, cut_off_util=0.05, openimg_size=256, gradient_policy='fed-prox', yogi_eta=0.003, yogi_tau=1e-08, yogi_beta=0.9, yogi_beta2=0.99, qfed_q=1.0, proxy_mu=0.001, cfg_file='./utils/rcnn/cfgs/res101.yml', test_output_dir='./logs/server', train_size_file='', test_size_file='', data_cache='', backbone='./resnet50.pth', malicious_factor=1000000000000000.0, max_concurrency=10, max_staleness=5, noise_factor=0.1, clip_threshold=3.0, target_delta=0.0001, t_budget=300, pacer_delta=50, pacer_step=20, exploration_alpha=0.3, exploration_factor=0.9, exploration_decay=0.98, sample_window=20.0, round_threshold=30, round_penalty=2.0, dropout_a=0.1, dropout_b=0.6, confidence_beta=0.7, number_clients_to_refresh_utility=300, number_clients_to_predict_utility=300, amount_clients_predict_train_set=500, amount_clients_refresh_train_set=500, ema_alpha=0.7, g_model='xgboost', h_model='xgboost', xgboost_g_n_estimators=300, xgboost_g_learning_rate=0.05, xgboost_g_max_depth=6, xgboost_g_subsample=0.8, xgboost_g_colsample_bytree=0.8, xgboost_g_objective='reg:squarederror', xgboost_g_n_jobs=1, xgboost_g_eval_metric='rmse', xgboost_h_n_estimators=300, xgboost_h_learning_rate=0.05, xgboost_h_max_depth=6, xgboost_h_subsample=0.8, xgboost_h_colsample_bytree=0.8, xgboost_h_objective='reg:squarederror', xgboost_h_n_jobs=1, xgboost_h_eval_metric='rmse', mlp_g_hidden_layer_sizes='128,64', mlp_g_max_iter=50, mlp_g_learning_rate_init=0.001, mlp_g_batch_size=256, mlp_h_hidden_layer_sizes='128,64', mlp_h_max_iter=50, mlp_h_learning_rate_init=0.001, mlp_h_batch_size=256, linreg_g_fit_intercept=False, linreg_g_positive=False, linreg_h_fit_intercept=False, linreg_h_positive=False, collect_data=False, adaptive_training=False, budget_recheck_steps=5, ewma_lambda=0.7, min_payload_frac=0.3, run_phase_2=True, line_by_line=False, clf_block_size=32, mlm=False, mlm_probability=0.15, overwrite_cache=False, block_size=64, weight_decay='4e-5', adam_epsilon=1e-08, vocab_token_size=10000, vocab_tag_size=500, epsilon=0.9, gamma=0.9, memory_capacity=2000, target_replace_iter=15, n_actions=2, n_states=4, num_classes=596, train_manifest='data/train_manifest.csv', test_manifest='data/test_manifest.csv', sample_rate=16000, labels_path='labels.json', window_size=0.02, window_stride=0.01, window='hamming', hidden_size=256, hidden_layers=7, rnn_type='lstm', finetune=False, speed_volume_perturb=False, spec_augment=False, noise_dir=None, noise_prob=0.4, noise_min=0.0, noise_max=0.5, bidirectional=True, checkpoint_interval=30, resume_from='', config_override='/users/eleves-a/2024/baptiste.geisenberger/FedScale/docker/openimage_centralized_1031_190557_job_conf.json', num_class=596)
+(10-31) 19:06:03 INFO     [aggregator.py:578] Initiating control plane communication ...
+(10-31) 19:06:03 INFO     [aggregator.py:601] %%%%% Opening aggregator server using port [::]:29500 %%%%%
+(10-31) 19:06:03 INFO     [fllibs.py:103] Initializing the model ...
+(10-31) 19:06:03 INFO     [aggregator.py:650] model amount of parameters: 6599972, model size: 211.000000
+(10-31) 19:06:03 INFO     [aggregator.py:1926] Start monitoring events ...
+2025-10-31 19:06:11.987017: I tensorflow/core/util/port.cc:111] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2025-10-31 19:06:12.004184: E tensorflow/compiler/xla/stream_executor/cuda/cuda_dnn.cc:9342] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+2025-10-31 19:06:12.004203: E tensorflow/compiler/xla/stream_executor/cuda/cuda_fft.cc:609] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+2025-10-31 19:06:12.004207: E tensorflow/compiler/xla/stream_executor/cuda/cuda_blas.cc:1518] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+2025-10-31 19:06:12.007001: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: SSE4.1 SSE4.2 AVX AVX2 AVX_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+(10-31) 19:06:13 INFO     [fllibs.py:103] Initializing the model ...
+(10-31) 19:06:13 INFO     [executor.py:81] (EXECUTOR:1) is setting up environ ...
+(10-31) 19:06:14 INFO     [executor.py:133] Data partitioner starts ...
+Number of Paricipants = 1
+(10-31) 19:06:14 INFO     [divide_data.py:73] Partitioning data by profile /Data/baptiste.geisenberger/Data/openImg/centralized_mapping/train.csv...
+(10-31) 19:06:14 INFO     [divide_data.py:102] Trace names are client_id, sample_path, label_name, label_id
+(10-31) 19:06:15 INFO     [divide_data.py:164] Randomly partitioning data, 190135 samples...
+(10-31) 19:06:15 INFO     [executor.py:156] Data partitioner completes ...
+(10-31) 19:06:15 INFO     [channel_context.py:20] %%%%%%%%%% Opening grpc connection to 129.104.252.56 %%%%%%%%%%
+(10-31) 19:06:15 INFO     [executor.py:516] Start monitoring events ...
+(10-31) 19:06:15 INFO     [aggregator.py:857] Received executor 1 information (ip=129.104.252.56), 1/1
+(10-31) 19:06:15 INFO     [aggregator.py:835] Loading 1 client traces ...
+(10-31) 19:06:15 INFO     [aggregator.py:844] Info of all feasible clients {'total_feasible_clients': 1, 'total_num_samples': 1229351}
+(10-31) 19:06:15 INFO     [aggregator.py:1204] Bootstrap: BEGINNING of round 0
+(10-31) 19:06:15 INFO     [client_manager.py:349] Wall clock time: 0, 1 clients online, 0 clients offline
+(10-31) 19:06:15 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 0, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(10-31) 19:06:15 INFO     [aggregator.py:1307] Selected 1 participants to run: [1113]
+(10-31) 19:06:16 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(10-31) 19:06:17 INFO     [aggregator.py:1887] Issue EVENT (model_test) to EXECUTOR (1)
+(10-31) 19:13:21 INFO     [model_test_module.py:309] Rank 1: Test set: Average loss: 6.39, Top-1 Accuracy: 36.0/190135 (0.0002), Top-5 Accuracy: 0.0012
+(10-31) 19:13:21 INFO     [aggregator.py:1160] FL Testing in round: 0, virtual_clock: 0.0, results: {'round': 0, 'clock': 0.0, 'top_1': 0.00018933915375917112, 'top_5': 0.00117285086911931, 'loss': 6.389958537603612}
+(10-31) 19:13:21 INFO     [aggregator.py:1668] logging test result
+(10-31) 19:13:21 INFO     [aggregator.py:282] [TEST_RESULT] {"round": 0, "clock": 0.0, "loss": 6.389958537603612, "top1": 0.00018933915375917112, "top5": 0.00117285086911931}
+(10-31) 19:13:22 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(10-31) 19:46:16 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 1, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.8320845288464065, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(10-31) 19:46:16 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 1, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(10-31) 19:46:16 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(10-31) 19:46:16 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(10-31) 19:46:18 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(10-31) 20:19:10 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 2, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.7450602621308335, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(10-31) 20:19:10 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 2, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(10-31) 20:19:10 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(10-31) 20:19:11 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(10-31) 20:19:12 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(10-31) 20:52:05 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 3, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.823494444951011, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(10-31) 20:52:05 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 3, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(10-31) 20:52:05 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(10-31) 20:52:06 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(10-31) 20:52:07 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(10-31) 21:25:00 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 4, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.7232934175521586, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(10-31) 21:25:00 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 4, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(10-31) 21:25:00 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(10-31) 21:25:01 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(10-31) 21:25:02 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(10-31) 21:57:56 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 5, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.8314258612364307, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(10-31) 21:57:56 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 5, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(10-31) 21:57:56 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(10-31) 21:57:56 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(10-31) 21:57:58 INFO     [aggregator.py:1887] Issue EVENT (model_test) to EXECUTOR (1)
+(10-31) 22:05:22 INFO     [model_test_module.py:309] Rank 1: Test set: Average loss: 6.39, Top-1 Accuracy: 36.0/190135 (0.0002), Top-5 Accuracy: 0.0012
+(10-31) 22:05:22 INFO     [aggregator.py:1160] FL Testing in round: 5, virtual_clock: 0.0, results: {'round': 5, 'clock': 0.0, 'top_1': 0.00018933915375917112, 'top_5': 0.00117285086911931, 'loss': 6.38995833223633}
+(10-31) 22:05:22 INFO     [aggregator.py:1668] logging test result
+(10-31) 22:05:22 INFO     [aggregator.py:282] [TEST_RESULT] {"round": 5, "clock": 0.0, "loss": 6.38995833223633, "top1": 0.00018933915375917112, "top5": 0.00117285086911931}
+(10-31) 22:05:23 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(10-31) 22:38:16 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 6, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.7171353939764054, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(10-31) 22:38:16 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 6, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(10-31) 22:38:16 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(10-31) 22:38:17 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(10-31) 22:38:18 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(10-31) 23:11:11 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 7, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.8570386408378454, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(10-31) 23:11:11 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 7, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(10-31) 23:11:11 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(10-31) 23:11:12 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(10-31) 23:11:13 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(10-31) 23:44:06 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 8, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.859203512051892, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(10-31) 23:44:06 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 8, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(10-31) 23:44:06 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(10-31) 23:44:07 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(10-31) 23:44:08 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(11-01) 00:17:01 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 9, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.8332268041230586, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(11-01) 00:17:02 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 9, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(11-01) 00:17:02 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(11-01) 00:17:02 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(11-01) 00:17:03 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(11-01) 00:49:57 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 10, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.797837791020194, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(11-01) 00:49:57 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 10, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(11-01) 00:49:57 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(11-01) 00:49:58 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(11-01) 00:49:59 INFO     [aggregator.py:1887] Issue EVENT (model_test) to EXECUTOR (1)
+(11-01) 00:57:26 INFO     [model_test_module.py:309] Rank 1: Test set: Average loss: 6.39, Top-1 Accuracy: 36.0/190135 (0.0002), Top-5 Accuracy: 0.0012
+(11-01) 00:57:26 INFO     [aggregator.py:1160] FL Testing in round: 10, virtual_clock: 0.0, results: {'round': 10, 'clock': 0.0, 'top_1': 0.00018933915375917112, 'top_5': 0.00117285086911931, 'loss': 6.389958526693475}
+(11-01) 00:57:26 INFO     [aggregator.py:1668] logging test result
+(11-01) 00:57:26 INFO     [aggregator.py:282] [TEST_RESULT] {"round": 10, "clock": 0.0, "loss": 6.389958526693475, "top1": 0.00018933915375917112, "top5": 0.00117285086911931}
+(11-01) 00:57:27 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)
+(11-01) 01:30:20 INFO     [aggregator.py:282] [CLIENT_INFO] {"round": 11, "clock_start": 0.0, "clock_end": 0.0, "duration": 0.0, "loss_avg": 1.839447991289128, "random_client_information": {"1113": [0.0, 0.0, 0.0, "c"]}}
+(11-01) 01:30:20 INFO     [aggregator.py:282] [ROUND_BEGIN] {"round": 11, "start_clock": 0.0, "pacer": {"algo": "random", "note": "no pacer state"}}
+(11-01) 01:30:20 INFO     [aggregator.py:1535] Selected 1 participants to run: [1113]
+(11-01) 01:30:21 INFO     [aggregator.py:1887] Issue EVENT (update_model) to EXECUTOR (1)
+(11-01) 01:30:22 INFO     [aggregator.py:1887] Issue EVENT (client_train) to EXECUTOR (1)

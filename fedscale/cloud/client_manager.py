@@ -261,8 +261,22 @@ class ClientManager:
             self.pyr_sampler.update_client_util(client_id, feedbacks=feedbacks)
 
         elif self.mode == "bliss":
+            stored_reward = float(reward) if success else 0.0
+
+            if success and not getattr(self.args, "adaptive_training", False):
+                t_budget = float(getattr(self.args, "t_budget", 0.0) or 0.0)
+                round_penalty = float(getattr(self.args, "round_penalty", 0.0) or 0.0)
+                dur = float(duration) if duration is not None else None
+
+                if t_budget > 0.0 and dur is not None:
+                    if dur > t_budget:
+                        penalty = (dur / t_budget) ** round_penalty
+                    else:
+                        penalty = 1.0
+                    stored_reward *= penalty
+
             feedbacks = {
-                'reward': reward if success else 0,
+                'reward': stored_reward,
                 'success': success
             }
             self.bliss_sampler.update_client_metadata_post_training(client_id, feedbacks)

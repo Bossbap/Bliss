@@ -255,9 +255,36 @@ class Executor(object):
                 client_id=client_id, conf=client_conf, model=config["model"]
             )
         except Exception:
-            logging.exception("[executor %s] Uncaught exception, cid=%d", 
-                            self.executor_id, client_id)
-            train_res = {"client_id": client_id, "success": False}
+            # Build a well-formed failure payload to keep the aggregator robust.
+            # Fall back to reporting zero utility and the current model weights,
+            # so aggregation can proceed without KeyErrors or type mismatches.
+            logging.exception(
+                "[executor %s] Uncaught exception, cid=%d",
+                self.executor_id,
+                client_id,
+            )
+            try:
+                # Ensure we always return a dict-of-arrays consistent with TorchClient
+                # so the aggregator's mixer can handle it.
+                model_obj = config.get("model", None)
+                if model_obj is not None and hasattr(model_obj, "state_dict"):
+                    sd = model_obj.state_dict()
+                    update_weight = {k: v.detach().cpu().numpy() for k, v in sd.items()}
+                else:
+                    update_weight = {}
+            except Exception:
+                update_weight = {}
+
+            train_res = {
+                "client_id": client_id,
+                "moving_loss": 0.0,
+                "trained_size": 0,
+                "success": False,
+                "utility": 0.0,
+                "update_weight": update_weight,
+                "wall_duration": 0.0,
+                "iters": 0,
+            }
 
 
         # Report execution completion meta information
@@ -283,6 +310,12 @@ class Executor(object):
             config (dictionary): The client testing config.
 
         """
+        # Remember which real client id the server asked us to evaluate,
+        # so the testing handler can load the matching shard when available.
+        try:
+            self._test_client_id = int(config.get("client_id", self.this_rank))
+        except Exception:
+            self._test_client_id = self.this_rank
         test_res = self.testing_handler(model=config["model"])
         test_res = {"executorId": self.this_rank, "results": test_res}
 
@@ -418,13 +451,18 @@ class Executor(object):
         except Exception:
             live_tok = None
         test_config = self.override_conf({
-            "rank": self.this_rank,
+            # For CSV-based partitions, the rank is the real client id
+            # whose test shard will be loaded below.
+            "rank": getattr(self, "_test_client_id", self.this_rank),
             "memory_capacity": self.args.memory_capacity,
             "tokenizer": live_tok,
         })
         client = self.get_client_trainer(test_config)
+        # When a mapping CSV is available, use the real client id to pick
+        # the test subset; otherwise fall back to executor rank.
+        select_rank = getattr(self, "_test_client_id", self.this_rank)
         data_loader = select_dataset(
-            self.this_rank,
+            select_rank,
             self.testing_sets,
             batch_size=self.args.test_bsz,
             args=self.args,

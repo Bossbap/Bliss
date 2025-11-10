@@ -73,6 +73,8 @@ class ClientMetadata:
 
         # most-recent end-to-end latency (sec)
         self.last_duration = None
+        # cache of the latest simulated download/compute/upload breakdown
+        self._last_time_breakdown: Optional[dict] = None
 
     def get_score(self):
         return self.score
@@ -293,7 +295,25 @@ class ClientMetadata:
         t_comp = compute_end - download_end
         t_ul  = upload_end - compute_end
         t_total = t_dl + t_comp + t_ul
+
+        # Cache latest breakdown (used by server-side logging)
+        self.last_duration = float(t_total)
+        self._last_time_breakdown = {
+            "t_dl": float(t_dl),
+            "t_comp": float(t_comp),
+            "t_ul": float(t_ul),
+            "t_total": float(t_total),
+            "local_steps": int(local_steps),
+            "dropout_frac": float(dropout_p),
+        }
+
         return float(t_comp), float(t_total)
+
+    def get_last_time_breakdown(self) -> Optional[dict]:
+        """Return a copy of the latest simulated time breakdown (or None if unavailable)."""
+        if self._last_time_breakdown is None:
+            return None
+        return dict(self._last_time_breakdown)
 
     def get_download_time(self, cur_time: float, model_size_mb: float,
                           clock_factor: float = 1.0) -> float:
@@ -354,6 +374,7 @@ class ClientMetadata:
             "last_duration": self.last_duration,
             "_round_noise": self._round_noise,
             "rng_state": self._rng.bit_generator.state,
+            "_last_time_breakdown": dict(self._last_time_breakdown) if self._last_time_breakdown is not None else None,
         }
 
     @classmethod
@@ -378,6 +399,7 @@ class ClientMetadata:
         obj.score = state.get("score", obj.score)
         obj.last_duration = state.get("last_duration")
         obj._round_noise = state.get("_round_noise", obj._round_noise)
+        obj._last_time_breakdown = state.get("_last_time_breakdown")
 
         rng_state = state.get("rng_state")
         if rng_state is not None:

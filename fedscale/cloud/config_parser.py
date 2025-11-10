@@ -1,7 +1,20 @@
 import argparse
 import json
+import logging
 
 from fedscale.cloud import commons
+
+
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ("true", "1", "yes", "y", "t", "on"):
+            return True
+        if lowered in ("false", "0", "no", "n", "f", "off"):
+            return False
+    raise argparse.ArgumentTypeError(f"Boolean value expected, got {value!r}")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--job_name", type=str, default="demo_job")
@@ -57,7 +70,7 @@ parser.add_argument("--data_set", type=str, default="cifar10")
 parser.add_argument("--sample_mode", type=str, default="random")
 parser.add_argument("--filter_less", type=int, default=32)
 parser.add_argument("--filter_more", type=int, default=1e15)
-parser.add_argument("--train_uniform", type=bool, default=False)
+parser.add_argument("--train_uniform", type=str2bool, default=False)
 parser.add_argument("--conf_path", type=str, default="~/dataset/")
 parser.add_argument("--overcommitment", type=float, default=1.3)
 parser.add_argument("--model_size", type=float, default=65536)
@@ -214,17 +227,17 @@ parser.add_argument("--linreg_g_positive",      action="store_true")
 parser.add_argument("--linreg_h_fit_intercept", action="store_true")
 parser.add_argument("--linreg_h_positive",      action="store_true")
 
-parser.add_argument("--collect_data",            type=bool,   default=False, help="Used to collect train data for regressors in thirdpary/bliss/regressor_test/datasets to experiment on h and g regressors")
+parser.add_argument("--collect_data",            type=str2bool,   default=False, help="Used to collect train data for regressors in thirdpary/bliss/regressor_test/datasets to experiment on h and g regressors")
 
 
 
 
 # local training strategy
-parser.add_argument("--adaptive_training",                 type=bool,   default=False)
+parser.add_argument("--adaptive_training",                 type=str2bool,   default=False)
 parser.add_argument("--budget_recheck_steps",              type=int,   default=5)
 parser.add_argument("--ewma_lambda",                       type=float,   default=0.7)
 parser.add_argument("--min_payload_frac",                  type=float,   default=0.3)
-parser.add_argument("--run_phase_2",                       type=bool,   default=True)
+parser.add_argument("--run_phase_2",                       type=str2bool,   default=True)
 
 
 # for albert
@@ -238,7 +251,7 @@ parser.add_argument("--clf_block_size", type=int, default=32)
 
 parser.add_argument(
     "--mlm",
-    type=bool,
+    type=str2bool,
     default=False,
     help="Train with masked-language modeling loss instead of language modeling.",
 )
@@ -250,7 +263,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--overwrite_cache",
-    type=bool,
+    type=str2bool,
     default=False,
     help="Overwrite the cached training and evaluation sets",
 )
@@ -393,9 +406,50 @@ parser.add_argument(
     default="",
     help="Path to a checkpoint directory to resume from (empty string starts fresh).",
 )
+parser.add_argument(
+    "--config_override",
+    type=str,
+    default="",
+    help="Path to a JSON file containing launcher-provided config overrides.",
+)
 
 args, unknown = parser.parse_known_args()
-args.use_cuda = eval(args.use_cuda)
+
+logger = logging.getLogger(__name__)
+
+
+def _apply_config_override(namespace):
+    """Override parsed args with values from an optional JSON file."""
+    override_path = getattr(namespace, "config_override", "") or ""
+    if not override_path:
+        return
+    try:
+        with open(override_path, "r", encoding="utf-8") as fin:
+            override_payload = json.load(fin)
+    except FileNotFoundError:
+        logger.warning("Config override file %s not found; continuing with CLI args.", override_path)
+        return
+    except json.JSONDecodeError:
+        logger.exception("Failed to parse config override file %s; continuing with CLI args.", override_path)
+        return
+    except Exception:
+        logger.exception("Unexpected error while reading config override file %s", override_path)
+        return
+
+    for key, value in override_payload.items():
+        if key == "config_override":
+            continue
+        setattr(namespace, key, value)
+
+    logger.info("Applied config overrides from %s", override_path)
+
+
+_apply_config_override(args)
+
+if isinstance(args.use_cuda, str):
+    args.use_cuda = eval(args.use_cuda)
+else:
+    args.use_cuda = bool(args.use_cuda)
 
 
 datasetCategories = {

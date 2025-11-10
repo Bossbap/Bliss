@@ -82,6 +82,20 @@ def process_cmd(yaml_file, local=False):
     for conf in yaml_conf['job_conf']:
         job_conf.update(conf)
 
+    job_name = job_conf.get("job_name", job_name)
+
+    current_path = os.path.dirname(os.path.abspath(__file__))
+    conf_override_path = ""
+    if use_container == "default":
+        conf_override_filename = f"{job_name}_{time_stamp}_job_conf.json"
+        conf_override_path = os.path.join(current_path, conf_override_filename)
+        try:
+            with open(conf_override_path, "w", encoding="utf-8") as conf_file:
+                json.dump(job_conf, conf_file, indent=2)
+        except Exception as err:
+            print(f"Warning: failed to write config override file {conf_override_path}: {err}")
+            conf_override_path = ""
+
     conf_script = ''
     setup_cmd = ''
     if yaml_conf['setup_commands'] is not None:
@@ -98,6 +112,9 @@ def process_cmd(yaml_file, local=False):
         if conf_name == "log_path":
             log_path = os.path.join(
                 job_conf[conf_name], 'log', job_name, time_stamp)
+
+    if conf_override_path:
+        conf_script = conf_script + f' --config_override {shlex.quote(conf_override_path)}'
 
     total_gpu_processes = sum([sum(x) for x in total_gpus])
 
@@ -198,9 +215,20 @@ def process_cmd(yaml_file, local=False):
     job_name = os.path.join(current_path, job_name)
     with open(job_name, 'wb') as fout:
         if use_container == "docker":
-            job_meta = {'user': submit_user, 'vms': running_vms, 'container_dict': ctnr_dict, 'use_container': use_container}
+            job_meta = {
+                'user': submit_user,
+                'vms': running_vms,
+                'container_dict': ctnr_dict,
+                'use_container': use_container,
+                'conf_override_path': conf_override_path,
+            }
         else:
-            job_meta = {'user': submit_user, 'vms': running_vms, 'use_container': use_container}
+            job_meta = {
+                'user': submit_user,
+                'vms': running_vms,
+                'use_container': use_container,
+                'conf_override_path': conf_override_path,
+            }
         pickle.dump(job_meta, fout)
 
     # =========== Container: initialize containers ============
@@ -303,6 +331,15 @@ def terminate(job_name):
             with open(f"{job_name}_logging", 'a') as fout:
                 subprocess.Popen(f'ssh {job_meta["user"]}{vm_ip} "python {current_path}/shutdown.py {job_name}"',
                                 shell=True, stdout=fout, stderr=fout)
+
+    conf_override_path = job_meta.get('conf_override_path', '')
+    if conf_override_path:
+        try:
+            os.remove(conf_override_path)
+        except FileNotFoundError:
+            pass
+        except Exception as err:
+            print(f"Warning: failed to remove config override file {conf_override_path}: {err}")
 
 def submit_to_k8s(yaml_conf):
     # TODO: switch to real deployment configs, pod configs are only for testing usage right now

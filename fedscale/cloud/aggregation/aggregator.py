@@ -121,6 +121,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         self.model_in_update = 0
         self.update_lock = threading.Lock()
         self.model_weights = None
+        self._aggregation_weight_sum = 0.0
 
         # ======== channels ========
         self.connection_timeout = self.args.connection_timeout
@@ -287,7 +288,15 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
     #  Checkpoint helpers
     # ------------------------------------------------------------------
     def _merge_args(self, live_args, saved_args):
-        """Merge runtime args with checkpoint args, keeping runtime-specific overrides."""
+        """Merge runtime args with checkpoint args, keeping runtime-specific overrides.
+
+        When resuming from a checkpoint, most arguments should come from the
+        original run to ensure determinism and continuity. However, certain
+        operational knobs must remain overrideable from the new invocation.
+        In addition to network/runtime fields (e.g., ps_ip, executor layout),
+        allow `rounds` to be increased/decreased so a run can continue past
+        the originally planned number of rounds.
+        """
         live_dict = copy.deepcopy(vars(live_args))
         runtime_overrides = {
             "ps_ip",
@@ -300,6 +309,8 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             "time_stamp",
             "resume_from",
             "checkpoint_interval",
+            # Allow changing total number of rounds upon resume
+            "rounds",
         }
         for key, value in (saved_args or {}).items():
             if key in runtime_overrides:
@@ -693,6 +704,45 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             return
         self._finalise_adaptive_round()
 
+    def _record_non_adaptive_time_breakdown(self, clients_to_run, round_stragglers):
+        """Copy the most recent simulated download/compute/upload breakdown for logging."""
+        self._client_time_breakdown = {}
+        candidate_ids = list(clients_to_run) + list(round_stragglers)
+        seen = set()
+
+        for cid in candidate_ids:
+            cid_int = int(cid)
+            if cid_int in seen:
+                continue
+            seen.add(cid_int)
+
+            try:
+                meta = self.client_manager.getClient(cid_int)
+            except KeyError:
+                continue
+
+            getter = getattr(meta, "get_last_time_breakdown", None)
+            breakdown = getter() if callable(getter) else None
+            if not breakdown:
+                continue
+
+            t_dl = float(breakdown.get("t_dl", 0.0))
+            t_comp = float(breakdown.get("t_comp", 0.0))
+            t_ul = float(breakdown.get("t_ul", 0.0))
+            iters = int(breakdown.get("local_steps", getattr(self.args, "local_steps", 0)))
+            dropf = float(breakdown.get("dropout_frac", 0.0))
+
+            if self.client_manager.mode != "pyramidfl":
+                dropf = 0.0
+
+            self._client_time_breakdown[cid_int] = {
+                "t_dl": t_dl,
+                "t_comp": t_comp,
+                "t_ul": t_ul,
+                "iters": iters,
+                "dropout_frac": dropf,
+            }
+
     def _finalise_adaptive_round(self):
         """Filter to the K fastest active clients, aggregate them, feed back stragglers."""
         K = self.args.num_participants
@@ -965,6 +1015,8 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         dur_for_feedback = self.virtual_client_clock[cid]
 
+        # debug logging removed
+
         # record for summary
         self._client_round_utils[cid] = float(results.get("utility", 0.0))
         if results.get("success", True):
@@ -1014,32 +1066,51 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         :param results: the results collected from the client.
         """
 
+        # debug logging removed
+
         upd = results["update_weight"]
+        weight = float(results.get("trained_size", 0.0) or 0.0)
+        if weight <= 0.0:
+            fallback = getattr(self.args, "local_steps", 0) * getattr(
+                self.args, "batch_size", 0
+            )
+            weight = float(fallback) if fallback > 0 else 1.0
+
         if self._is_first_result_in_round():
+            self._aggregation_weight_sum = weight
             if isinstance(upd, dict):
                 self.param_order = list(upd.keys())
                 self.model_weights = {
-                    k: v.copy() if hasattr(v, "copy") else copy.deepcopy(v)
+                    k: (
+                        (v.copy() if hasattr(v, "copy") else copy.deepcopy(v)) * weight
+                    )
                     for k, v in upd.items()
                 }
             else:
                 self.param_order = list(range(len(upd)))
                 self.model_weights = [
-                    w.copy() if hasattr(w, "copy") else copy.deepcopy(w) for w in upd
+                    (w.copy() if hasattr(w, "copy") else copy.deepcopy(w)) * weight
+                    for w in upd
                 ]
+            # debug logging removed
             return
 
+        self._aggregation_weight_sum += weight
         if isinstance(upd, dict):
             for k, v in upd.items():
-                self.model_weights[k] += v
+                self.model_weights[k] += v * weight
         else:
             for idx, v in enumerate(upd):
-                self.model_weights[idx] += v
+                self.model_weights[idx] += v * weight
+
+        # debug logging removed
 
         if not self._is_last_result_in_round():
             return
 
-        denom = float(self.tasks_round) if self.tasks_round else 1.0
+        denom = (
+            float(self._aggregation_weight_sum) if self._aggregation_weight_sum else 1.0
+        )
 
         if isinstance(self.model_weights, dict):
             to_send = []
@@ -1057,10 +1128,13 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                 key=lambda r: int(r.get("client_id", 0))
             )
 
+        # debug logging removed
+
         self.model_wrapper.set_weights(
             copy.deepcopy(to_send),
             client_training_results=self.client_training_results,
         )
+        self._aggregation_weight_sum = 0.0
 
     # ----------------------------------------------------------------------
     #  Testing
@@ -1187,48 +1261,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                     self.round_stragglers = round_stragglers
                     self._sampled_durations = sampled_durations
 
-                    # Build per-client non-adaptive time breakdown (download/compute/upload)
-                    self._client_time_breakdown = {}
-
-                    def _fill_breakdown(cid: int):
-                        meta = self.client_manager.getClient(cid)
-                        # dropout (PyramidFL override) for this cid if any
-                        drop_p = 0.0
-                        local_steps = getattr(self.args, "local_steps", 0)
-                        if self.client_manager.mode == "pyramidfl":
-                            ov = self.client_manager.get_pyramidfl_conf(cid) or {}
-                            drop_p = float(ov.get("dropout_p", 0.0) or 0.0)
-                            local_steps = int(ov.get("local_steps", local_steps))
-                        # t_dl, t_comp, t_total
-                        t_dl = meta.get_download_time(
-                            cur_time=self.global_virtual_clock,
-                            model_size_mb=self.model_size,
-                            clock_factor=self.args.clock_factor,
-                        )
-                        t_comp, t_total = meta.get_times_with_dropout(
-                            cur_time=self.global_virtual_clock,
-                            batch_size=self.args.batch_size,
-                            local_steps=local_steps if local_steps else self.args.local_steps,
-                            model_size=self.model_size,
-                            model_amount_parameters=self.model_amount_parameters,
-                            reduction_factor=0.5,
-                            dropout_p=drop_p,
-                            clock_factor=self.args.clock_factor,
-                        )
-                        t_ul = max(0.0, t_total - t_dl - t_comp)
-                        self._client_time_breakdown[int(cid)] = {
-                            "t_dl": float(t_dl),
-                            "t_comp": float(t_comp),
-                            "t_ul": float(t_ul),
-                            "iters": int(local_steps if local_steps else self.args.local_steps),
-                            "dropout_frac": float(drop_p),
-                        }
-
-                    # plan times for both top-K and stragglers (active-throughout candidates)
-                    for cid in clients_to_run:
-                        _fill_breakdown(int(cid))
-                    for cid in round_stragglers:
-                        _fill_breakdown(int(cid))
+                    self._record_non_adaptive_time_breakdown(clients_to_run, round_stragglers)
 
                 self._pre_util_map = {}
                 if self.client_manager.mode in ("oort", "pyramidfl"):
@@ -1380,37 +1413,68 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                         val = self._client_round_utils.get(sid, 0.0)
                     post_util[sid] = float(val)
 
+            adaptive_training = bool(getattr(self.args, "adaptive_training", False))
+            run_phase_2 = bool(getattr(self.args, "run_phase_2", False)) if adaptive_training else False
             client_info = {}
             for sid in selected_ids:
-                tb = self._client_time_breakdown.get(sid, {})
+                tb = self._client_time_breakdown.get(sid, {}) or {}
                 t_dl = float(tb.get("t_dl", 0.0))
                 t_comp = float(tb.get("t_comp", 0.0))
                 t_ul = float(tb.get("t_ul", 0.0))
-                st = status_map.get(sid, 's')
+                st = status_map.get(sid, "s")
 
-                if mode == 'random':
-                    client_info[sid] = [t_dl, t_comp, t_ul, st]
-                elif mode in ('oort', 'pyramidfl'):
-                    iters = int(tb.get("iters", 0)) if mode == 'pyramidfl' else 0
-                    dropf = float(tb.get("dropout_frac", 0.0)) if mode == 'pyramidfl' else 0.0
-                    pu = float(pre_util.get(sid, 0.0))
-                    cu = float(post_util.get(sid, self._client_round_utils.get(sid, 0.0)))
-                    client_info[sid] = [t_dl, t_comp, t_ul, iters, dropf, pu, cu, st]
-                elif mode == 'bliss':
-                    it_p1 = int(tb.get("iters_phase1", 0))
-                    it_p2 = int(tb.get("iters_phase2", 0))
-                    dropf = float(tb.get("dropout_frac", 0.0))
-                    if sid in (self._bliss_pred_seen or {}):
-                        pred = float(self._bliss_pred_seen[sid])
-                        seen_flag = True
-                    elif sid in (self._bliss_pred_unseen or {}):
-                        pred = float(self._bliss_pred_unseen[sid])
-                        seen_flag = False
+                iters_phase1 = 0
+                iters_phase2 = 0
+                dropout_frac = 0.0
+
+                if adaptive_training:
+                    # Executors report per-phase iterations for adaptive runs.
+                    iters_phase1 = int(tb.get("iters_phase1", tb.get("iters_p1", 0)))
+                    if run_phase_2:
+                        iters_phase2 = int(tb.get("iters_phase2", tb.get("iters_p2", 0)))
+                        dropout_frac = float(tb.get("dropout_frac", 0.0))
                     else:
-                        pred = 0.0
-                        seen_flag = False
-                    cu = float(self._client_round_utils.get(sid, 0.0))
-                    client_info[sid] = [t_dl, t_comp, t_ul, it_p1, it_p2, dropf, pred, cu, st, bool(seen_flag)]
+                        iters_phase2 = 0
+                        dropout_frac = 0.0
+                else:
+                    if mode == "pyramidfl":
+                        iters_phase1 = int(tb.get("iters", tb.get("local_steps", getattr(self.args, "local_steps", 0))))
+                        iters_phase2 = 0
+                        dropout_frac = float(tb.get("dropout_frac", 0.0))
+                    else:
+                        iters_phase1 = 0
+                        iters_phase2 = 0
+                        dropout_frac = 0.0
+
+                predicted_utility = 0.0
+                computed_utility = 0.0
+
+                if mode == "random":
+                    predicted_utility = 0.0
+                    computed_utility = 0.0
+                elif mode in ("oort", "pyramidfl"):
+                    predicted_utility = float(pre_util.get(sid, 0.0))
+                    computed_utility = float(post_util.get(sid, self._client_round_utils.get(sid, 0.0)))
+                elif mode == "bliss":
+                    if sid in (self._bliss_pred_seen or {}):
+                        predicted_utility = float(self._bliss_pred_seen[sid])
+                    elif sid in (self._bliss_pred_unseen or {}):
+                        predicted_utility = float(self._bliss_pred_unseen[sid])
+                    computed_utility = float(self._client_round_utils.get(sid, 0.0))
+                else:
+                    computed_utility = float(self._client_round_utils.get(sid, 0.0))
+
+                client_info[sid] = [
+                    t_dl,
+                    t_comp,
+                    t_ul,
+                    iters_phase1,
+                    iters_phase2,
+                    dropout_frac,
+                    predicted_utility,
+                    computed_utility,
+                    st,
+                ]
 
             payload = {
                 "round": meta_payload["round"],
@@ -1418,9 +1482,9 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
                 "clock_end": meta_payload["clock_end"],
                 "duration": meta_payload["duration"],
                 "loss_avg": meta_payload["loss_avg"],
-                "completed": meta_payload["completed"],
-                "stragglers": meta_payload["stragglers"],
-                "dropped": meta_payload["dropped"],
+                # "completed": meta_payload["completed"],
+                # "stragglers": meta_payload["stragglers"],
+                # "dropped": meta_payload["dropped"],
                 info_key: client_info,
             }
             self._log_json("CLIENT_INFO", payload)
@@ -1476,8 +1540,7 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             self.round_duration = round_duration
             self.round_stragglers = round_stragglers
             self._sampled_durations = sampled_durations
-            # Do not re-simulate per-client breakdown here to preserve RNG determinism
-            self._client_time_breakdown = {}
+            self._record_non_adaptive_time_breakdown(clients_to_run, round_stragglers)
 
         self._pre_util_map = {}
         if self.client_manager.mode in ("oort", "pyramidfl"):
@@ -1744,6 +1807,8 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
             padded = {**vars(self.args), **config}
             self.client_conf[next_client_id] = types.SimpleNamespace(**padded)
             train_config = {"client_id": next_client_id, "task_config": config}
+        else:
+            pass
         return train_config, self.model_wrapper.get_weights()
 
     def get_test_config(self, client_id):

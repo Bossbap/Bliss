@@ -30,6 +30,43 @@ except ModuleNotFoundError:
     tqdm = None  # type: ignore
 
 
+def resolve_xgb_device(preferred: str | None) -> tuple[str, str, str]:
+    """
+    Return a tuple (device, tree_method, predictor) compatible with XGBoost ≥3.1.
+
+    • If `preferred` is provided, use it verbatim (with CPU/GPU-specific defaults).
+    • Otherwise, probe for a CUDA GPU once; fall back to CPU on failure.
+    """
+    if preferred:
+        device = preferred
+        is_cpu = device.lower() == "cpu"
+        return (
+            device,
+            "hist" if is_cpu else "gpu_hist",
+            "auto" if is_cpu else "gpu_predictor",
+        )
+
+    try:
+        import xgboost as xgb
+
+        probe = xgb.XGBRegressor(
+            n_estimators=1,
+            max_depth=1,
+            tree_method="gpu_hist",
+            device="cuda:0",
+            objective="reg:squarederror",
+            eval_metric="rmse",
+        )
+        probe.fit(
+            np.zeros((4, 1), dtype=np.float32),
+            np.zeros(4, dtype=np.float32),
+            verbose=False,
+        )
+        return "cuda:0", "gpu_hist", "gpu_predictor"
+    except Exception:
+        return "cpu", "hist", "auto"
+
+
 def load_latest_csv(data_dir: Path, regressor: str) -> pd.DataFrame:
     csvs = sorted(data_dir.glob(f"{regressor}_*.csv"))
     if not csvs:
@@ -107,6 +144,30 @@ def main() -> None:
                         help="Number of CV folds (default=2 for speed)")
     parser.add_argument("--n_jobs", type=int, default=1,
                         help="Number of parallel configs to evaluate")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=None,
+        help="XGBoost device string (e.g. cuda:0 or cpu). Auto-detect when omitted.",
+    )
+    parser.add_argument(
+        "--max_configs",
+        type=int,
+        default=None,
+        help="Optional cap on number of configs to evaluate (sampled from the grid)",
+    )
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        default=str(Path("thirdparty/bliss/regressor_test/hp_configs")),
+        help="Directory to store results. Results saved under <save_dir>/<job_name>/",
+    )
+    parser.add_argument(
+        "--job_name",
+        type=str,
+        default=None,
+        help="Optional job_name; defaults to the last component of data_dir",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -122,33 +183,66 @@ def main() -> None:
     rounds = df["round"].to_numpy(np.int32)
 
     if args.model == "xgboost":
+        device, tree_method, predictor = resolve_xgb_device(args.device)
+        logging.info("XGBoost device: %s (%s/%s)", device, tree_method, predictor)
         base_gpu = dict(
-            tree_method="gpu_hist",
-            predictor="gpu_predictor",
-            gpu_id=0,
+            tree_method=tree_method,
+            predictor=predictor,
+            device=device,
             objective="reg:squarederror",
             eval_metric="rmse",
             verbosity=0
         )
+        # Expanded search space tuned for ~hours-long runs.
+        # Includes regularization and split heuristics.
         grid = {
-            "n_estimators":     [200, 500],
-            "learning_rate":    [0.02, 0.05, 0.1],
-            "max_depth":        [3, 4, 6, 8],
-            "subsample":        [0.7, 1.0],
-            "colsample_bytree": [0.7, 1.0],
+            "n_estimators":      [200, 400, 600, 800, 1000],
+            "learning_rate":     [0.01, 0.02, 0.05, 0.1],
+            "max_depth":         [3, 4, 5, 6, 8, 10],
+            "subsample":         [0.6, 0.8, 1.0],
+            "colsample_bytree":  [0.6, 0.8, 1.0],
+            "min_child_weight":  [1, 5, 10],
+            "reg_alpha":         [0.0, 0.1, 0.5],
+            "reg_lambda":        [1.0, 2.0, 5.0],
+            "gamma":             [0.0, 1.0, 5.0],
         }
-        cfgs = [ {**base_gpu, **g} for g in ParameterGrid(grid) ]
+        cfgs_full = [ {**base_gpu, **g} for g in ParameterGrid(grid) ]
+        if args.max_configs is not None and args.max_configs < len(cfgs_full):
+            rng = np.random.default_rng(42)
+            idx = rng.choice(len(cfgs_full), size=args.max_configs, replace=False)
+            cfgs = [cfgs_full[i] for i in idx]
+        else:
+            cfgs = cfgs_full
     else:
+        # Expanded MLP grid. We keep solver='adam' due to early stopping support.
         grid = {
-            "hidden_layer_sizes": [(64,), (128,), (32,)],
-            "learning_rate_init": [1e-3, 3e-4, 1e-4],
-            "batch_size":         [32, 64],
-            "alpha":              [1e-4, 1e-3],
+            "hidden_layer_sizes": [
+                (64,), (128,), (256,),
+                (64, 64), (128, 64), (256, 128),
+                (128, 128, 64),
+            ],
+            "activation":         ["relu", "tanh"],
+            "learning_rate_init": [1e-2, 3e-3, 1e-3, 3e-4, 1e-4],
+            "batch_size":         [32, 64, 128, 256],
+            "alpha":              [1e-5, 1e-4, 1e-3, 1e-2],
+            "solver":             ["adam"],
         }
-        cfgs = list(ParameterGrid(grid))
+        cfgs_full = list(ParameterGrid(grid))
+        if args.max_configs is not None and args.max_configs < len(cfgs_full):
+            rng = np.random.default_rng(42)
+            idx = rng.choice(len(cfgs_full), size=args.max_configs, replace=False)
+            cfgs = [cfgs_full[i] for i in idx]
+        else:
+            cfgs = cfgs_full
+
+    # Resolve output directory under hp_configs/<job_name>
+    job_name = args.job_name or Path(args.data_dir).name
+    save_root = Path(args.save_dir) / job_name
+    save_root.mkdir(parents=True, exist_ok=True)
 
     n_cfg = len(cfgs)
-    logging.info("Grid size: %d configurations", n_cfg)
+    logging.info("Grid size: %d configurations%s", n_cfg,
+                 " (sampled)" if args.max_configs else "")
 
     results: list[tuple[float, dict]] = []
     t0 = perf_counter()
@@ -191,10 +285,27 @@ def main() -> None:
     print(f"Elapsed     : {elapsed/60:.1f} min")
     print("==========================")
 
-    out = Path(args.data_dir) / f"best_{args.model}_{args.regressor}.json"
-    with out.open("w") as f:
-        json.dump([{"rmse": s, **c} for s, c in results], f, indent=2)
-    logging.info("Full ranking written to %s", out)
+    # Persist ranking to both the dataset folder and hp_configs/<job_name>
+    ranking = [{"rmse": s, **c} for s, c in results]
+    out1 = Path(args.data_dir) / f"best_{args.model}_{args.regressor}.json"
+    out2 = save_root / f"best_{args.model}_{args.regressor}.json"
+    for out in (out1, out2):
+        with out.open("w") as f:
+            json.dump(ranking, f, indent=2)
+        logging.info("Full ranking written to %s", out)
+
+    # Also store a minimal snippet with the single best config
+    best_snippet = {k: v for k, v in best_cfg.items() if k not in {"tree_method", "predictor", "device", "verbosity", "objective", "eval_metric"}}
+    best_meta = {
+        "model": args.model,
+        "regressor": args.regressor,
+        "cv_splits": args.cv_splits,
+        "n_jobs": args.n_jobs,
+        "rmse": best_rmse,
+        "params": best_snippet,
+    }
+    with (save_root / f"best_{args.model}_{args.regressor}_params.json").open("w") as f:
+        json.dump(best_meta, f, indent=2)
 
 
 if __name__ == "__main__":

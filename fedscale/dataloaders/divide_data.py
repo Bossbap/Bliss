@@ -58,41 +58,96 @@ class DataPartitioner(object):
         return [len(self.client_label_cnt[i]) for i in range(self.getClientLen())]
 
     def trace_partition(self, data_map_file):
-        """Read data mapping from data_map_file. Format: <client_id, sample_name, ...>"""
+        """Read data mapping from data_map_file and align it to the dataset indices.
+
+        Format assumption: CSV columns contain at least
+            0: client_id
+            1: sample_path (relative name used by the dataset)
+            -1: label_id (optional)
+
+        We map sample_path to the actual index in ``self.data`` so that
+        partition indices are guaranteed to be valid for the underlying
+        dataset. This avoids IndexError when dataset content or ordering
+        differs from the CSV enumeration.
+        """
         logging.info(f"Partitioning data by profile {data_map_file}...")
 
+        # Build a name->index map from the instantiated dataset when possible.
+        # Some datasets (e.g., Google Speech) expose file names via
+        # ``self.data.data``. Others (e.g., StackOverflow NLP) expose token
+        # sequences (lists), which are unhashable and cannot serve as keys.
+        name_to_idx = {}
+        try:
+            dataset_names = list(getattr(self.data, 'data'))
+            # Only construct the map if entries are hashable (e.g., str paths)
+            if len(dataset_names) > 0:
+                try:
+                    _ = hash(dataset_names[0])
+                    name_to_idx = {name: idx for idx, name in enumerate(dataset_names)}
+                except TypeError:
+                    # Unhashable entries (e.g., list tokens) – skip name mapping
+                    name_to_idx = {}
+        except Exception:
+            name_to_idx = {}
+
         client_dict: dict[int, list[int]] = {}
-        sample_id = 0
+        total_rows = 0
+        mapped_rows = 0
+        missing_rows = 0
 
         with open(data_map_file) as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
-            # skip header
-            header = next(csv_reader)
-            logging.info(f"Trace names are {', '.join(header)}")
+            header = next(csv_reader, None)  # skip header if present
+            if header:
+                logging.info(f"Trace names are {', '.join(header)}")
 
             for row in csv_reader:
-                client_id = int(row[0])
+                total_rows += 1
+                try:
+                    client_id = int(row[0])
+                except Exception:
+                    # Malformed row – skip
+                    missing_rows += 1
+                    continue
 
-                # append this sample index under that client
-                client_dict.setdefault(client_id, []).append(sample_id)
+                sample_name = row[1] if len(row) > 1 else None
+                if sample_name is None:
+                    missing_rows += 1
+                    continue
+                # Two possibilities for the mapping's second column:
+                # 1) A numeric dataset index (used by StackOverflow TextDataset)
+                # 2) A file/sample name that we need to resolve via name_to_idx
+                idx = None
+                # Try numeric index first
+                try:
+                    cand = int(sample_name)
+                    if 0 <= cand < len(self.data):
+                        idx = cand
+                except Exception:
+                    pass
+                # Fall back to name lookup if available
+                if idx is None and name_to_idx:
+                    idx = name_to_idx.get(sample_name, None)
+                if idx is None:
+                    # The CSV lists a sample not present in the local dataset.
+                    # Skip it to keep indices valid.
+                    missing_rows += 1
+                    continue
 
-                # if you track label counts, keep using the real ID
-                self.client_label_cnt[client_id].add(row[-1])
+                client_dict.setdefault(client_id, []).append(idx)
+                self.client_label_cnt[client_id].add(row[-1] if row else None)
+                mapped_rows += 1
 
-                sample_id += 1
-
-        # Expose exactly what executor.report_executor_info_handler expects:
-        #   a dict mapping real_client_id -> list of sample indices
+        # Expose the mapping expected by the runtime
         self.client_dict = client_dict
-
         sorted_ids = sorted(client_dict.keys())
-        self.partitions = [ client_dict[cid] for cid in sorted_ids ]
+        self.partitions = [client_dict[cid] for cid in sorted_ids]
 
-        total_clients = len(sorted_ids)
-        # logging.info(f"[DEBUG] Total clients partitioned: {total_clients}")
-        # for cid in sorted_ids:
-        #     cnt = len(client_dict[cid])
-        #     logging.info(f"[DEBUG] Client {cid}: {cnt} samples")
+        if missing_rows:
+            logging.warning(
+                "trace_partition: %d/%d samples from mapping were not found in the dataset and were skipped",
+                missing_rows, total_rows,
+            )
 
     def partition_data_helper(self, num_clients, data_map_file=None):
 
@@ -133,7 +188,7 @@ class DataPartitioner(object):
     def get_partition_by_client(self, client_id: int, istest: bool):
         """Return a torch-Compatible `Partition` object for the given
         *real* client id."""
-        idx_list = self.client_dict.get(client_id, [])
+        idx_list = list(self.client_dict.get(client_id, []))  # copy to avoid in-place shuffles
         if istest:
             idx_list = idx_list[: int(len(idx_list) * self.args.test_ratio)]
         self.rng.shuffle(idx_list)

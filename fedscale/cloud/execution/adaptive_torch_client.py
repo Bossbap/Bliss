@@ -432,8 +432,8 @@ class AdaptiveTorchClient(TorchClient):
                 for i, t in enumerate(full_sd.values())
             }
 
-            trained_unique = min(len(client_data.dataset),
-                                steps_done * conf.batch_size)
+            trained_total = steps_done * conf.batch_size
+            trained_unique = min(len(client_data.dataset), trained_total)
 
             # ----------- utility: same definition as vanilla --------------
             rms_loss    = math.sqrt(self.loss_sq_sum / max(1, self.seen_samples))
@@ -442,7 +442,7 @@ class AdaptiveTorchClient(TorchClient):
             return {
                 "client_id"    : conf.client_id,
                 "moving_loss"  : self.epoch_train_loss,
-                "trained_size" : trained_unique,
+                "trained_size" : trained_total,
                 "success"      : True,
                 "utility"      : utility_val,
                 "update_weight": update_dict,

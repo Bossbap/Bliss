@@ -49,16 +49,21 @@ class TorchServerOptimizer(object):
             last_model = [x.to(device=self.device) for x in last_model]
             current_model = [x.to(device=self.device) for x in current_model]
 
+            # debug logging removed
+
             diff_weight = self.gradient_controller.update(
                 [pa - pb for pa, pb in zip(last_model, current_model)]
             )
 
-            new_state_dict = {
-                name: torch.from_numpy(
-                    np.array(last_model[idx] + diff_weight[idx], dtype=np.float32)
-                )
-                for idx, name in enumerate(target_model.state_dict().keys())
-            }
+            target_state = target_model.state_dict()
+            new_state_dict = {}
+            for idx, (name, param) in enumerate(target_state.items()):
+                updated = (last_model[idx] + diff_weight[idx]).detach()
+                # Ensure the tensor matches the parameter's dtype/device before loading.
+                updated = updated.to(device=param.device, dtype=param.dtype)
+                new_state_dict[name] = updated.clone()
+
+            # debug logging removed
 
             target_model.load_state_dict(new_state_dict)
 
