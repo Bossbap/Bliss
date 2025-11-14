@@ -5,7 +5,7 @@ from fedscale.cloud.fllibs import *
 
 class ClientMetadata:
     """
-    Contains the server-side metadata for a single client,
+    Contains the metadata for a single client,
     including static device capacities and dynamic time-varying traces.
     """
 
